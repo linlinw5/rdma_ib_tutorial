@@ -137,6 +137,15 @@ RDMA 这套语义最初是为 InfiniBand 设计的，因此 RoCE 是移植，IB 
 
 ---
 
+## 第四部分　RDMA 在 AI 训练中的样子
+
+前面三部分把 RDMA 和 InfiniBand 拆成了一个个零件。这一部分把它们装回真实场景——看一次 AI 训练里最常见的集合通信，在多台 GPU 服务器之间到底怎么用 RDMA。
+
+**[第 19 章　从抓包看 NCCL 如何使用 RDMA](CN/19_nccl_rdma.md)**
+用三节点 GPU 服务器做 AllReduce 抓包，把前面的 QP、带外 TCP 建连、RDMA Write、集合算法串成一条完整、可观测的数据流。先用全量抓包看清"建连三步"（rendezvous → NCCL bootstrap 交换 QPN/GID/rkey → RDMA），再用 Ring 与 Tree 两组抓包对照看数据层面的区别。
+
+---
+
 ## 参考来源
 
 本文档的技术内容基于以下公开标准、文档与工具的官方资料整理而成。具体引用与扩展阅读：
@@ -169,6 +178,11 @@ RDMA 这套语义最初是为 InfiniBand 设计的，因此 RoCE 是移植，IB 
 
 本文档采用 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.zh) 授权，完整条款见 [LICENSE](./LICENSE) 。
 
-Author: Linlin Wang
+您可以自由地复制、转载、修改和商业使用本文内容，但必须遵守以下条件：
 
-Contact: wanglinlin.cn@gmail.com
+- 署名（BY）：保留原作者信息，并注明修改情况（如有）。
+- 相同方式共享（SA）：基于本文内容创作的衍生作品，公开发布时必须继续采用 CC BY-SA 4.0 许可协议。
+
+作者: Linlin Wang
+
+联系方式: wanglinlin.cn@gmail.com

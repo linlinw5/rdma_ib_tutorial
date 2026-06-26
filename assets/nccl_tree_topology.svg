@@ -1,0 +1,72 @@
+<svg width="100%" viewBox="0 0 720 420" role="img" xmlns="http://www.w3.org/2000/svg" style="">
+<title style="fill:rgb(0, 0, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">NCCL Tree 0 and Tree 1 for three ranks</title>
+<defs>
+  <marker id="arrd" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#1D9E75" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="arru" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#E07B39" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+
+
+<text x="180" y="30" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="600" fill="#185FA5" style="fill:rgb(24, 95, 165);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:15px;font-weight:600;text-anchor:middle;dominant-baseline:auto">Tree 0</text>
+
+
+<rect x="105" y="52" width="150" height="52" rx="8" fill="#F3E8FF" stroke="#7C3AED" stroke-width="1" style="fill:rgb(243, 232, 255);stroke:rgb(124, 58, 237);color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<text x="180" y="72" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600" fill="#5B21B6" style="fill:rgb(91, 33, 182);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:13px;font-weight:600;text-anchor:middle;dominant-baseline:auto">rank 0  ·  root</text>
+<text x="180" y="90" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#7C3AED" style="fill:rgb(124, 58, 237);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:11px;font-weight:400;text-anchor:middle;dominant-baseline:auto">parent = none</text>
+
+
+<rect x="105" y="178" width="150" height="52" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1" style="fill:rgb(230, 241, 251);stroke:rgb(24, 95, 165);color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<text x="180" y="198" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600" fill="#0C447C" style="fill:rgb(12, 68, 124);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:13px;font-weight:600;text-anchor:middle;dominant-baseline:auto">rank 2  ·  internal</text>
+<text x="180" y="216" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#185FA5" style="fill:rgb(24, 95, 165);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:11px;font-weight:400;text-anchor:middle;dominant-baseline:auto">parent=0  child=1</text>
+
+
+<rect x="105" y="304" width="150" height="52" rx="8" fill="#E6FAF3" stroke="#1D9E75" stroke-width="1" style="fill:rgb(230, 250, 243);stroke:rgb(29, 158, 117);color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<text x="180" y="324" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600" fill="#0D6B4F" style="fill:rgb(13, 107, 79);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:13px;font-weight:600;text-anchor:middle;dominant-baseline:auto">rank 1  ·  leaf</text>
+<text x="180" y="342" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#1D9E75" style="fill:rgb(29, 158, 117);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:11px;font-weight:400;text-anchor:middle;dominant-baseline:auto">parent=2  no child</text>
+
+
+
+<line x1="180" y1="104" x2="180" y2="175" stroke="#1D9E75" stroke-width="1.5" marker-end="url(#arrd)" style="fill:rgb(0, 0, 0);stroke:rgb(29, 158, 117);color:rgb(0, 0, 0);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+<line x1="180" y1="230" x2="180" y2="301" stroke="#1D9E75" stroke-width="1.5" marker-end="url(#arrd)" style="fill:rgb(0, 0, 0);stroke:rgb(29, 158, 117);color:rgb(0, 0, 0);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+<line x1="162" y1="301" x2="162" y2="233" stroke="#E07B39" stroke-width="1.5" marker-end="url(#arru)" style="fill:rgb(0, 0, 0);stroke:rgb(224, 123, 57);color:rgb(0, 0, 0);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+<line x1="162" y1="175" x2="162" y2="107" stroke="#E07B39" stroke-width="1.5" marker-end="url(#arru)" style="fill:rgb(0, 0, 0);stroke:rgb(224, 123, 57);color:rgb(0, 0, 0);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+
+<line x1="48" y1="380" x2="78" y2="380" stroke="#E07B39" stroke-width="1.5" marker-end="url(#arru)" style="fill:rgb(0, 0, 0);stroke:rgb(224, 123, 57);color:rgb(0, 0, 0);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<text x="84" y="384" font-family="sans-serif" font-size="11" fill="#555" style="fill:rgb(85, 85, 85);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:11px;font-weight:400;text-anchor:start;dominant-baseline:auto">reduce (leaf→root)</text>
+<line x1="48" y1="400" x2="78" y2="400" stroke="#1D9E75" stroke-width="1.5" marker-end="url(#arrd)" style="fill:rgb(0, 0, 0);stroke:rgb(29, 158, 117);color:rgb(0, 0, 0);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<text x="84" y="404" font-family="sans-serif" font-size="11" fill="#555" style="fill:rgb(85, 85, 85);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:11px;font-weight:400;text-anchor:start;dominant-baseline:auto">broadcast (root→leaf)</text>
+
+
+<text x="540" y="30" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="600" fill="#185FA5" style="fill:rgb(24, 95, 165);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:15px;font-weight:600;text-anchor:middle;dominant-baseline:auto">Tree 1</text>
+
+
+<rect x="465" y="52" width="150" height="52" rx="8" fill="#F3E8FF" stroke="#7C3AED" stroke-width="1" style="fill:rgb(243, 232, 255);stroke:rgb(124, 58, 237);color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<text x="540" y="72" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600" fill="#5B21B6" style="fill:rgb(91, 33, 182);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:13px;font-weight:600;text-anchor:middle;dominant-baseline:auto">rank 1  ·  root</text>
+<text x="540" y="90" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#7C3AED" style="fill:rgb(124, 58, 237);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:11px;font-weight:400;text-anchor:middle;dominant-baseline:auto">parent = none</text>
+
+
+<rect x="465" y="178" width="150" height="52" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1" style="fill:rgb(230, 241, 251);stroke:rgb(24, 95, 165);color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<text x="540" y="198" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600" fill="#0C447C" style="fill:rgb(12, 68, 124);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:13px;font-weight:600;text-anchor:middle;dominant-baseline:auto">rank 0  ·  internal</text>
+<text x="540" y="216" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#185FA5" style="fill:rgb(24, 95, 165);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:11px;font-weight:400;text-anchor:middle;dominant-baseline:auto">parent=1  child=2</text>
+
+
+<rect x="465" y="304" width="150" height="52" rx="8" fill="#E6FAF3" stroke="#1D9E75" stroke-width="1" style="fill:rgb(230, 250, 243);stroke:rgb(29, 158, 117);color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<text x="540" y="324" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600" fill="#0D6B4F" style="fill:rgb(13, 107, 79);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:13px;font-weight:600;text-anchor:middle;dominant-baseline:auto">rank 2  ·  leaf</text>
+<text x="540" y="342" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#1D9E75" style="fill:rgb(29, 158, 117);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:sans-serif;font-size:11px;font-weight:400;text-anchor:middle;dominant-baseline:auto">parent=0  no child</text>
+
+
+<line x1="540" y1="104" x2="540" y2="175" stroke="#1D9E75" stroke-width="1.5" marker-end="url(#arrd)" style="fill:rgb(0, 0, 0);stroke:rgb(29, 158, 117);color:rgb(0, 0, 0);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<line x1="540" y1="230" x2="540" y2="301" stroke="#1D9E75" stroke-width="1.5" marker-end="url(#arrd)" style="fill:rgb(0, 0, 0);stroke:rgb(29, 158, 117);color:rgb(0, 0, 0);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<line x1="522" y1="301" x2="522" y2="233" stroke="#E07B39" stroke-width="1.5" marker-end="url(#arru)" style="fill:rgb(0, 0, 0);stroke:rgb(224, 123, 57);color:rgb(0, 0, 0);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<line x1="522" y1="175" x2="522" y2="107" stroke="#E07B39" stroke-width="1.5" marker-end="url(#arru)" style="fill:rgb(0, 0, 0);stroke:rgb(224, 123, 57);color:rgb(0, 0, 0);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+
+<line x1="360" y1="44" x2="360" y2="380" stroke="#ccc" stroke-width="1" stroke-dasharray="4 3" style="fill:rgb(0, 0, 0);stroke:rgb(204, 204, 204);color:rgb(0, 0, 0);stroke-width:1px;stroke-dasharray:4px, 3px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+</svg>

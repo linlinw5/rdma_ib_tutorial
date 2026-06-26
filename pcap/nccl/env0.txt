@@ -1,0 +1,147 @@
+== uname ==
+Linux node0 6.8.0-53-generic #55-Ubuntu SMP PREEMPT_DYNAMIC Fri Jan 17 15:37:52 UTC 2025 x86_64 x86_64 x86_64 GNU/Linux
+== nvidia-smi ==
+Thu Jun 25 15:19:37 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.159.03             Driver Version: 580.159.03     CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  Tesla P40                      Off |   00000000:00:08.0 Off |                    0 |
+| N/A   21C    P8              9W /  250W |       0MiB /  23040MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+== ibv_devinfo ==
+hca_id:	rxe0
+	transport:			InfiniBand (0)
+	fw_ver:				0.0.0
+	node_guid:			f816:3eff:fea3:1662
+	sys_image_guid:			f816:3eff:fea3:1662
+	vendor_id:			0xffffff
+	vendor_part_id:			0
+	hw_ver:				0x0
+	phys_port_cnt:			1
+	max_mr_size:			0xffffffffffffffff
+	page_size_cap:			0xfffff000
+	max_qp:				1048560
+	max_qp_wr:			1048576
+	device_cap_flags:		0x01223c76
+					BAD_PKEY_CNTR
+					BAD_QKEY_CNTR
+					AUTO_PATH_MIG
+					CHANGE_PHY_PORT
+					UD_AV_PORT_ENFORCE
+					PORT_ACTIVE_EVENT
+					SYS_IMAGE_GUID
+					RC_RNR_NAK_GEN
+					SRQ_RESIZE
+					MEM_WINDOW
+					MEM_MGT_EXTENSIONS
+					MEM_WINDOW_TYPE_2B
+	max_sge:			32
+	max_sge_rd:			32
+	max_cq:				1048576
+	max_cqe:			32767
+	max_mr:				524287
+	max_pd:				1048576
+	max_qp_rd_atom:			128
+	max_ee_rd_atom:			0
+	max_res_rd_atom:		258048
+	max_qp_init_rd_atom:		128
+	max_ee_init_rd_atom:		0
+	atomic_cap:			ATOMIC_HCA (1)
+	max_ee:				0
+	max_rdd:			0
+	max_mw:				524287
+	max_raw_ipv6_qp:		0
+	max_raw_ethy_qp:		0
+	max_mcast_grp:			8192
+	max_mcast_qp_attach:		56
+	max_total_mcast_qp_attach:	458752
+	max_ah:				32767
+	max_fmr:			0
+	max_srq:			917503
+	max_srq_wr:			1048576
+	max_srq_sge:			27
+	max_pkeys:			64
+	local_ca_ack_delay:		15
+	general_odp_caps:
+	rc_odp_caps:
+					NO SUPPORT
+	uc_odp_caps:
+					NO SUPPORT
+	ud_odp_caps:
+					NO SUPPORT
+	xrc_odp_caps:
+					NO SUPPORT
+	completion_timestamp_mask not supported
+	core clock not supported
+	device_cap_flags_ex:		0x1C001223C76
+					Unknown flags: 0x1C000000000
+	tso_caps:
+		max_tso:			0
+	rss_caps:
+		max_rwq_indirection_tables:			0
+		max_rwq_indirection_table_size:			0
+		rx_hash_function:				0x0
+		rx_hash_fields_mask:				0x0
+	max_wq_type_rq:			0
+	packet_pacing_caps:
+		qp_rate_limit_min:	0kbps
+		qp_rate_limit_max:	0kbps
+	tag matching not supported
+	num_comp_vectors:		12
+		port:	1
+			state:			PORT_ACTIVE (4)
+			max_mtu:		4096 (5)
+			active_mtu:		1024 (3)
+			sm_lid:			0
+			port_lid:		0
+			port_lmc:		0x00
+			link_layer:		Ethernet
+			max_msg_sz:		0x800000
+			port_cap_flags:		0x00010000
+			port_cap_flags2:	0x0000
+			max_vl_num:		1 (1)
+			bad_pkey_cntr:		0x0
+			qkey_viol_cntr:		0x0
+			sm_sl:			0
+			pkey_tbl_len:		1
+			gid_tbl_len:		1024
+			subnet_timeout:		0
+			init_type_reply:	0
+			active_width:		1X (1)
+			active_speed:		2.5 Gbps (1)
+			phys_state:		LINK_UP (5)
+			GID[  0]:		fe80::f816:3eff:fea3:1662, RoCE v2
+			GID[  1]:		::ffff:172.30.0.25, RoCE v2
+
+== ip addr ==
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host noprefixroute 
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc mq state UP group default qlen 1000
+    link/ether fa:16:3e:a3:16:62 brd ff:ff:ff:ff:ff:ff
+    altname enp0s3
+    altname ens3
+    inet 172.30.0.25/20 metric 100 brd 172.30.15.255 scope global dynamic eth0
+       valid_lft 83511sec preferred_lft 83511sec
+    inet6 fe80::f816:3eff:fea3:1662/64 scope link 
+       valid_lft forever preferred_lft forever
+== rdma link ==
+link rxe0/1 state ACTIVE physical_state LINK_UP netdev eth0 
+== ver ==
+torch 2.4.1+cu121 nccl (2, 20, 5)

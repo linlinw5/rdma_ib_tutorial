@@ -1,0 +1,32 @@
+node0:4222:4222 [0] NCCL INFO NCCL_SOCKET_IFNAME set by environment to eth0
+node0:4222:4222 [0] NCCL INFO Bootstrap : Using eth0:172.30.0.25<0>
+node0:4222:4222 [0] NCCL INFO NET/Plugin : dlerror=libnccl-net.so: cannot open shared object file: No such file or directory No plugin found (libnccl-net.so), using internal implementation
+node0:4222:4222 [0] NCCL INFO cudaDriverVersion 13000
+NCCL version 2.20.5+cuda12.4
+node0:4222:4241 [0] NCCL INFO NCCL_SOCKET_IFNAME set by environment to eth0
+node0:4222:4241 [0] NCCL INFO NCCL_IB_HCA set to rxe0
+
+node0:4222:4241 [0] transport/net_ib.cc:115 NCCL WARN Could not find real path of rxe0 (/sys/class/infiniband/rxe0/device)
+node0:4222:4241 [0] NCCL INFO NET/IB : Using [0]rxe0:1/RoCE [RO]; OOB eth0:172.30.0.25<0>
+node0:4222:4241 [0] NCCL INFO Using non-device net plugin version 0
+node0:4222:4241 [0] NCCL INFO Using network IB
+node0:4222:4241 [0] NCCL INFO comm 0x74012c0 rank 0 nranks 3 cudaDev 0 nvmlDev 0 busId 80 commId 0xa7530d65f76fbd07 - Init START
+node0:4222:4241 [0] NCCL INFO comm 0x74012c0 rank 0 nRanks 3 nNodes 3 localRanks 1 localRank 0 MNNVL 0
+node0:4222:4241 [0] NCCL INFO NCCL_MAX_NCHANNELS set by environment to 1.
+node0:4222:4241 [0] NCCL INFO Channel 00/01 :    0   1   2
+node0:4222:4241 [0] NCCL INFO Trees [0] 2/-1/-1->0->-1
+node0:4222:4241 [0] NCCL INFO P2P Chunksize set to 131072
+node0:4222:4241 [0] NCCL INFO Channel 00/0 : 2[0] -> 0[0] [receive] via NET/IB/0
+node0:4222:4241 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[0] [send] via NET/IB/0
+node0:4222:4243 [0] NCCL INFO NCCL_IB_GID_INDEX set by environment to 1.
+node0:4222:4241 [0] NCCL INFO Connected all rings
+node0:4222:4241 [0] NCCL INFO Channel 00/0 : 0[0] -> 2[0] [send] via NET/IB/0
+node0:4222:4241 [0] NCCL INFO Connected all trees
+node0:4222:4241 [0] NCCL INFO NCCL_PROTO set by environment to Simple
+node0:4222:4241 [0] NCCL INFO NCCL_ALGO set by environment to Ring
+node0:4222:4241 [0] NCCL INFO threadThresholds 8/8/64 | 24/8/64 | 512 | 512
+node0:4222:4241 [0] NCCL INFO 1 coll channels, 0 collnet channels, 0 nvls channels, 1 p2p channels, 1 p2p channels per peer
+node0:4222:4241 [0] NCCL INFO comm 0x74012c0 rank 0 nranks 3 cudaDev 0 nvmlDev 0 busId 80 commId 0xa7530d65f76fbd07 - Init COMPLETE
+rank 0/3 ok val=3.0 (expect 3)
+node0:4222:4243 [0] NCCL INFO [Service thread] Connection closed by localRank 0
+node0:4222:4251 [0] NCCL INFO comm 0x74012c0 rank 0 nranks 3 cudaDev 0 busId 80 - Abort COMPLETE

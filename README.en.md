@@ -1,4 +1,4 @@
-> 中文版本：[readme.md](./README.md.md)
+> 中文版本：[readme.md](./README.md)
 
 # A Deep Dive into RDMA and InfiniBand Networking
 

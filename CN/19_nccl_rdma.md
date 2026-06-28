@@ -519,7 +519,7 @@ IB 的 Credit 工作在链路层，它保护的是交换机和 HCA 的接收 Buf
 
 在纯 IB 网络中，IB Credit 和 NCCL FIFO Credit 各自工作在不同的层次，共同保证了一次 AllReduce 能够稳定、高效地运行。
 
-###　对照：Tree AllReduce
+### 对照：Tree AllReduce
 
 最后，我们来看一下 Tree AllReduce 的数据。先从三份日志把每个 rank 在两棵树里的位置提取出来:
 

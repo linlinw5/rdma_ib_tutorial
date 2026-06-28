@@ -1,16 +1,16 @@
 # 第 19 章　从抓包看 NCCL 如何使用 RDMA
 
-我们把 RDMA 和 InfiniBand 拆解成了一个个基础零件：QP、MR、rkey、Send/Write/Read、带外建连、SL/VL、路由、拥塞控制，以及在网计算。到了这里，是时候把这些零件重新组装回一台真实的机器，看看 AI 训练中最常见的集合通信操作 AllReduce，在三台 GPU 服务器之间究竟是如何发生的。
+在前面十八章的内容里，我们把 RDMA 和 InfiniBand 拆解成了一个个基础零件：QP、MR、rkey、Send/Write/Read、带外建连、SL/VL、路由、拥塞控制，以及在网计算。到了这里，是时候把这些零件重新组装回一台真实的机器，看看 AI 训练中最常见的集合通信操作 AllReduce，在三台 GPU 服务器之间究竟是如何发生的。
 
-需要说明的是，这一章并不是 NCCL 教程。关于 NCCL API 的资料已经非常丰富，相信在掌握了前面 RDMA 和 InfiniBand 的基础知识之后，再去阅读那些资料会轻松许多。因此，本章依然把重心放在网络本身：我们将在一个三节点 GPU 集群上，通过 PyTorch 发起一次 all_reduce 操作，并从网络视角观察节点之间产生的 NCCL 流量。
+一个需要说明：这一章并不是 NCCL 的教程。关于 NCCL API 的资料已经非常丰富，相信在掌握了前面 RDMA 和 InfiniBand 的基础知识之后，大家再去阅读那些资料会轻松许多。因此，本章依然把重心放在网络本身：我们将在一个三节点 GPU 集群上，通过 PyTorch 发起一次 all_reduce 操作，并从网络视角观察节点之间产生的 NCCL 流量。
 
-实验环境使用了我在京东云临时租赁的三台 GPU 服务器，并通过 Soft-RoCE 运行 RDMA 通信。
+实验环境使用了我在京东云临时租赁的三台 GPU 服务器，并通过 Soft-RoCE 运行 RDMA 通信。整个测试大约花费了一个小时左右的时间，整体租赁开销在 100 元人民币左右。
 
 ---
 
 ## 19.1　实验环境与脚本
 
-实验用三台单卡 GPU 服务器，放在同一个子网里，互相直接可达：
+实验用三台单卡 GPU 服务器，放在同一个子网里，互相直接可达（permit ip any any）：
 
 | 角色   | 主机  | IP          |
 | ------ | ----- | ----------- |
@@ -18,16 +18,19 @@
 | rank 1 | node1 | 172.30.0.11 |
 | rank 2 | node2 | 172.30.0.12 |
 
-每台的软件栈一致：
+每台服务器的硬件配置和软件栈一致：
 
 - GPU：Tesla P40 ×1
 - RDMA：Soft-RoCE，`rxe0` 绑在 `eth0` 上，GID index 1（IPv4 的 RoCE v2），MTU 1024
 - 框架：PyTorch 2.4.1，NCCL 2.20.5
+- [node0 environment](../pcap/nccl/env0.txt)
+- [node1 environment](../pcap/nccl/env1.txt)
+- [node2 environment](../pcap/nccl/env2.txt)
 
 ### 驱动及基础环境准备
 
 ```bash
-# 装驱动（P40 属于 Pascal，用 580）
+# 装驱动（P40 属于 Pascal 平台，最高只能用 580）
 apt update
 apt install -y build-essential dkms linux-headers-$(uname -r)
 apt install -y nvidia-driver-580
@@ -55,7 +58,7 @@ rdma link add rxe0 type rxe netdev eth0
 ibv_devinfo
 ```
 
-### 测试脚本
+### 准备测试脚本
 
 测试脚本 `test.py` 只做一件事：三个进程各占一卡，做一次 AllReduce。但它在时间上被刻意"撑开"了，方便抓包时把各阶段分清楚：
 
@@ -124,6 +127,8 @@ torchrun --nnodes=3 --node_rank=2 --nproc_per_node=1 \
 命令由三部分组成：环境变量(NCCL 调优)、`torchrun` 启动参数、以及输出重定向。下面分组说明。
 
 - NCCL 环境变量(控制集合通信底层行为)
+
+https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html
 
 | 参数                 | 取值     | 含义                                                                                                           |
 | -------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
@@ -206,7 +211,7 @@ torchrun --nnodes=3 --node_rank=2 --nproc_per_node=1 \
 
 拿到 unique ID 之后，**NCCL**在三节点之间又建了一圈 TCP 连接，源端口是一批随机的临时端口（如 55259、56325、54989...）。这就是 **NCCL bootstrap**。
 
-它干的事，正是第二章讲的**带外参数交换**：把每个 rank 建 RDMA QP 所需的信息（**QPN、GID、rkey** 等）通过这些 TCP 连接 all-gather 给所有人。换句话说，**RDMA 连接的所有"接线参数"，是在这里用 TCP 谈好的**。
+它干的事，正是第二章讲的**带外参数交换**：把每个 rank 建 RDMA QP 所需的信息（**QPN、GID、rkey** 等）通过这些 TCP 连接发给所有人。换句话说，**RDMA 连接的所有"接线参数"，是在这里用 TCP 谈好的**。
 
 NCCL 用"**TCP 带外**"建立连接，和 perftest/pingpong 是同一种思路。所以在 Wireshark 里，这些 bootstrap 连接的 payload 是一团不透明的二进制，我们能看到连接的建立、来回和时序，但解不了内容。与第六章的 RDMA CM 抓包相比，可以明显看到区别：
 
@@ -246,9 +251,9 @@ dist.barrier() 是一个同步栅栏，所有进程必须都执行到这一行�
 
 ## 19.3 测试二：NCCL 的 RDMA 深入分析
 
-这个测试，我们来更仔细的看看 NCCL 的 RDMA，观察和对比 NCCL 在采用不同的算法时的网络行为。
+接下来这个测试，我们来进一步仔细的看看 NCCL 的 RDMA，观察和对比 NCCL 在采用不同的算法时的网络行为。
 
-在上一节的测试中，有个NCCL的配置项 `NCCL_ALGO=Ring`,这是控制 NCCL 算法的选项，正常情况下 NCCL 会根据消息大小和规模自动挑合适的算法。一般来说，Ring 带宽利用率高、适合大消息；Tree 跳数少、延迟低、适合小消息和大规模。这一节，我们来观察和对比两种算法在网络行为上的差异。
+在上一节的测试中，有个NCCL的配置项 `NCCL_ALGO=Ring`，这是控制 NCCL 算法的选项，正常情况下 NCCL 会根据消息大小和规模自动挑合适的算法（RING 或 TREE 等等）。一般来说，Ring 带宽利用率高、适合大消息；Tree 跳数少、延迟低、适合小消息和大规模。这一节，我们来观察和对比两种算法在网络行为上的差异。
 
 ### 启动测试
 
@@ -309,7 +314,7 @@ tcpdump -i eth0 '(udp port 4791) or (tcp port 29500)' -w ~/tree2_$(hostname).pca
 source ~/venv/bin/activate
 
 NCCL_IB_HCA=rxe0 NCCL_IB_GID_INDEX=1 NCCL_SOCKET_IFNAME=eth0 \
-NCCL_ALGO=Ring NCCL_PROTO=Simple NCCL_MAX_NCHANNELS=1 NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET,GRAPH \
+NCCL_ALGO=Tree NCCL_PROTO=Simple NCCL_MAX_NCHANNELS=1 NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET,GRAPH \
 torchrun --nnodes=3 --node_rank=0 --nproc_per_node=1 \
   --master_addr=172.30.0.25 --master_port=29500 ~/test.py 2>&1 | tee ~/tree2_$(hostname).log
 
@@ -318,7 +323,7 @@ torchrun --nnodes=3 --node_rank=0 --nproc_per_node=1 \
 source ~/venv/bin/activate
 
 NCCL_IB_HCA=rxe0 NCCL_IB_GID_INDEX=1 NCCL_SOCKET_IFNAME=eth0 \
-NCCL_ALGO=Ring NCCL_PROTO=Simple NCCL_MAX_NCHANNELS=1 NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET,GRAPH \
+NCCL_ALGO=Tree NCCL_PROTO=Simple NCCL_MAX_NCHANNELS=1 NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET,GRAPH \
 torchrun --nnodes=3 --node_rank=1 --nproc_per_node=1 \
   --master_addr=172.30.0.25 --master_port=29500 ~/test.py 2>&1 | tee ~/tree2_$(hostname).log
 
@@ -327,7 +332,7 @@ torchrun --nnodes=3 --node_rank=1 --nproc_per_node=1 \
 source ~/venv/bin/activate
 
 NCCL_IB_HCA=rxe0 NCCL_IB_GID_INDEX=1 NCCL_SOCKET_IFNAME=eth0 \
-NCCL_ALGO=Ring NCCL_PROTO=Simple NCCL_MAX_NCHANNELS=1 NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET,GRAPH \
+NCCL_ALGO=Tree NCCL_PROTO=Simple NCCL_MAX_NCHANNELS=1 NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET,GRAPH \
 torchrun --nnodes=3 --node_rank=2 --nproc_per_node=1 \
   --master_addr=172.30.0.25 --master_port=29500 ~/test.py 2>&1 | tee ~/tree2_$(hostname).log
 ```
@@ -338,7 +343,7 @@ torchrun --nnodes=3 --node_rank=2 --nproc_per_node=1 \
 
 ###　NCCL 用的是 RDMA Write
 
-先看一个总体问题：本次捕获到的 NCCL 的数据搬运，靠的是单边的 **RDMA Write**。
+先观察一个比较明显的现象：本次捕获到的 NCCL 的数据搬运，靠的是单边的 **RDMA Write**。
 
 为什么是 Write 不是 Read？因为 Write 是"推"：发送方算完一块数据，直接写进对端早已注册好的接收缓冲区，一次单程、不需要等对端响应再回来。而 Read 是"拉"，要多一个网络往返。在 AllReduce 这种"我算完就尽快推给下家"的流水线里，Write 的单程语义天然契合。
 
@@ -441,9 +446,9 @@ node0:4744:4770 [0] NCCL INFO comm 0x43dc13b0 rank 0 nranks 3 cudaDev 0 busId 80
 
 ![nccl pcap](../assets/nccl_pcap.png)
 
-这是因为：除了真正的 AllReduce 数据流之外，NCCL 还会产生少量逆向的小型 RDMA Write。这些报文通常只有几十字节，并不承载 tensor 数据，而是用于更新 FIFO 状态、FIFO credit、同步 step 等控制信息。过滤掉这些控制报文之后，整个 AllReduce 的数据路径便呈现出一个非常干净的单向 Ring。
+这是因为：除了真正的 AllReduce 数据流之外，NCCL 还会产生少量逆向的小型 RDMA Write。这些报文通常只有几十/一百多字节，并不承载 tensor 数据，而是用于更新 FIFO 状态、FIFO credit、同步 step 等控制信息。过滤掉这些控制报文之后，整个 AllReduce 的数据路径便呈现出一个非常干净的单向 Ring。
 
-为了看清楚这个 RING，就必须把 tensor 数据报文和控制报文分开，我们直接用命令行版的 tshark 进行过滤。
+为了看清楚这个 RING，就必须把数据报文和控制报文分开，我们直接用命令行版的 tshark 进行过滤。
 
 > NCCL 的数据 chunk 是 KB 量级，而 RDMA 的控制报文和 Ack 报文都非常小，因此，直接按帧长 200 切，留下的就是真正的数据 Write。
 
@@ -492,10 +497,6 @@ ib_tutorial\pcap\nccl
 
 上一节提到了一个词：NCCL FIFO Credit。看到这里，也许你会感到奇怪：IB 的 credit 机制不是在链路层吗，为什么 NCCL 还要管 Credit？
 
-### NCCL 的 Credit
-
-上一节提到了一个词：NCCL FIFO Credit。看到这里，也许你会感到奇怪：IB 的 credit 机制不是在链路层吗，为什么 NCCL 还要管 Credit？
-
 答案是：IB 的 Credit 和 NCCL 的 FIFO Credit 虽然名字相同，但解决的是两个完全不同的问题。
 
 IB 的 Credit 工作在链路层，它保护的是交换机和 HCA 的接收 Buffer。发送端只有在确认对端仍然有空闲 Buffer 时，才能继续发送新的数据。因此，IB Credit 回答的问题其实是：**网络里还有没有地方放包。** 它的存在保证了 InfiniBand Fabric 可以实现无损传输，即使网络出现拥塞，也不会因为 Buffer 被写满而直接丢包。
@@ -504,13 +505,19 @@ IB 的 Credit 工作在链路层，它保护的是交换机和 HCA 的接收 Buf
 
 当一个节点执行 RDMA Write 时，数据最终会被直接写入对端 GPU 内存中的接收 FIFO。这个 FIFO 的大小是有限的，可以把它理解成一个环形缓冲区：发送方不断向里面写入新的 chunk，而接收方则不断从里面取出数据交给 GPU Kernel 进行 reduce 计算。如果接收方处理得比较慢，所有 FIFO entry 都可能被占满。此时，网络可能仍然非常空闲，IB 的 Credit 也仍然充足，但发送方已经不能再继续发送了，因为继续执行 RDMA Write 会覆盖尚未被消费的数据。
 
-因此，NCCL 在应用层又实现了一套自己的流控机制：FIFO Credit。
+因此，**NCCL 在应用层又实现了一套自己的流控机制：FIFO Credit**。
 
 每当接收方消费完一个 FIFO entry，就会通过一个很小的 RDMA Write，把最新的 FIFO 状态回写给发送方，告诉它有多少 entry 已经被释放，可以继续发送新的 chunk。这些回写报文通常只有几十字节，正是我们在抓包中看到的那些逆向小包。它们不承载任何 tensor 数据，只负责同步 FIFO 的状态，因此经常会和真正的数据流混在一起，给人一种 Ring 出现了“逆流”的错觉。
 
-从思想上看，NCCL 的 FIFO Credit 与 TCP 的滑动窗口非常相似。TCP 的窗口告诉发送方：我的 Socket Buffer 还能接收多少字节；而 NCCL 的 Credit 则是在告诉发送方：我的 GPU 接收 FIFO 还剩多少空闲 entry。两者都是一种生产者—消费者模型中的流控机制，只不过保护的对象不同。
+从思想上看，NCCL 的 FIFO Credit 与 TCP 的 Window 非常相似。TCP 的窗口告诉发送方：我的 Socket Buffer 还能接收多少字节；而 NCCL 的 Credit 则是在告诉发送方：我的 GPU 接收 FIFO 还剩多少空闲 entry。两者都是一种生产者—消费者模型中的流控机制，只不过保护的对象不同。
 
-因此，可以把这三种 Credit 看成三个层次的流控：IB Credit 保证网络不会丢包，TCP Window 保证接收端的 Socket 不会被写爆，而 NCCL FIFO Credit 则保证 GPU 的接收 FIFO 不会被写爆。它们各自工作在不同的层次，共同保证了一次 AllReduce 能够稳定、高效地运行。
+因此，可以把 NCCL FIFO Credit 与 IB Credit 和 TCP Window 放到一起对比：
+
+- IB Credit 保证网络不会丢包；
+- TCP Window 保证接收端的 Socket 不会被写爆；
+- NCCL FIFO Credit 则保证 GPU 的接收 FIFO 不会被写爆。
+
+在纯 IB 网络中，IB Credit 和 NCCL FIFO Credit 各自工作在不同的层次，共同保证了一次 AllReduce 能够稳定、高效地运行。
 
 ###　对照：Tree AllReduce
 
@@ -526,15 +533,15 @@ IB 的 Credit 工作在链路层，它保护的是交换机和 HCA 的接收 Buf
 >
 > -1 表示"无对应 rank"，出现在 parent 位是"我是根"，出现在 children 位是"这个子节点槽位空着"
 
-**两棵树都是退化的链。** 3 个 rank 撑不起真正的二叉树，只能退化成一条线:Tree 0 是 `0→2→1`,Tree 1 是 `1→0→2`。
+- **两棵树都是退化的链**： 3 个 rank 撑不起真正的二叉树，只能退化成一条线：Tree 0 是 `0→2→1`，Tree 1 是 `1→0→2`。
 
-**根和叶在两棵树里互换。** 这是double binary tree(双二叉树)。单棵树的问题是叶子节点只承担一半通信(只收不发或只发不收)，链路利用不充分；NCCL 同时构造两棵“角色互补”的树，让每个 rank 在一棵里当内部节点、在另一棵里当叶子(理想情况)，两棵树各跑一半数据，带宽就摊平了。
+- **根和叶在两棵树里互换**： 这是双二叉树(double binary tree)。单棵树的问题是叶子节点只承担一半通信(只收不发或只发不收)，链路利用不充分；NCCL 同时构造两棵“角色互补”的树，让每个 rank 在一棵里当内部节点、在另一棵里当叶子(理想情况)，两棵树各跑一半数据，带宽就摊平了。
 
 翻译成拓扑图就是：
 
 ![nccl tree](../assets/nccl_tree_topology.svg)
 
-在我们的测试代码中，因为仅做了一次 allreduce，并且设置了 `NCCL_MAX_NCHANNELS=1`，测试数据量也比较小，因此从抓包看，数据被完全压到了 tree 0。这是正常现象，正常生产环境，流量会在两棵树上并行。
+在我们的测试代码中，因为仅做了一次 allreduce，并且设置了 `NCCL_MAX_NCHANNELS=1`，测试数据量也比较小，所以从抓包看，数据被完全压到了 tree 0，这是正常现象。正常生产环境，流量会在两棵树上并行，以摊平带宽。
 
 tshark 使用同样的方法进行过滤，数据 Write 的统计如下：
 
@@ -585,7 +592,7 @@ ib_tutorial\pcap\nccl
 
 ## 19.4　GDR(GPU Direct RDMA)
 
-最后看一个本实验环境的固有属性。三份日志都有这一行：
+最后解释一个本实验环境里特殊的告警日志。三份日志都有这一行：
 
 ```bash
 NET/IB : GPU Direct RDMA Disabled for HCA 0 'rxe0'

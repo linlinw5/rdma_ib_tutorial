@@ -2,9 +2,7 @@
 
 rping 是 `librdmacm-utils` 包里的工具，专门用来测试 rdma_cm 连通性，类似 RDMA 世界的 ping。
 
-实验环境中目前共两台 vm，安装了 soft-RoCE，后续的测试，将 `10.1.16.61` 作为服务端，将 `10.1.16.62` 作为客户端。
-
-![rping](../assets/rping.png)
+继续上一章的测试，实验环境依旧不变，将 `10.1.16.61` 作为服务端，将 `10.1.16.62` 作为客户端。
 
 [pcap抓包文件](../pcap/rping.pcap)
 
@@ -22,6 +20,8 @@ rping -c -a 10.1.16.61 -C 5 -v
 
 # `-C 5` 是 5 次，`-v` 打印每次 ping 的结果，`-d rxe0` 指定设备。
 ```
+
+测试结果如下：
 
 ```bash
 # 测试结果
@@ -145,12 +145,14 @@ client DISCONNECT EVENT...
 
 ---
 
-## 7.2 解读pcap
+## 7.2 rping 案例时序全貌
 
-```
-包1-3    CM 建连          REQ → REP → RTU
-包4-63   5轮 ping-pong    每轮12个包
-包64-65  CM 断连          DREQ → DREP（客户端主动发起，服务端回复，单向挥手）
+![rping](../assets/rping.png)
+
+```bash
+包 1-3    CM 建连          REQ → REP → RTU
+包 4-63   5轮 ping-pong    每轮12个包
+包 64-65  CM 断连          DREQ → DREP（客户端主动发起，服务端回复，单向挥手）
 ```
 
 ---
@@ -159,28 +161,26 @@ client DISCONNECT EVENT...
 
 这是 rping 最精妙的地方，**每轮用了三种不同的 RDMA 操作**：
 
+```bash
+包 4   Send Only   62→61    客户端通告自己的 RKey/VAddr（日志中的 sink advertisement）
+包 5   ACK         61→62
+包 6   Read Req    61→62    服务端主动 Read 客户端内存，取 ping 数据
+包 7   Read Resp   62→61    客户端内存数据返回（含 ping-0 的ASCII数据）
+包 8   Send Only   61→62    服务端通知客户端"Read完了，可以继续"（go ahead）
+包 9   ACK         62→61
+包 10  Send Only   62→61    客户端通告服务端新的 sink 地址
+包 11  ACK         61→62
+包 12  Write Only  61→62    服务端写数据到客户端内存
+包 13  ACK         62→61
+包 14  Send Only   61→62    服务端通知"写完了"（go ahead）
+包 15  ACK         62→61
 ```
-包4   Send Only   62→61  74字节   客户端通告自己的 RKey/VAddr（sink advertisement）
-包5   ACK         61→62  62字节
-包6   Read Req    61→62  74字节   服务端主动 Read 客户端内存，取 ping 数据
-包7   Read Resp   62→61  126字节  客户端内存数据返回（含 ping-0 的ASCII数据）
-包8   Send Only   61→62  74字节   服务端通知客户端"Read完了，可以继续"（go ahead）
-包9   ACK         62→61  62字节
-包10  Send Only   62→61  74字节   客户端通告服务端新的 sink 地址
-包11  ACK         61→62  62字节
-包12  Write Only  61→62  138字节  服务端写数据到客户端内存
-包13  ACK         62→61  62字节
-包14  Send Only   61→62  74字节   服务端通知"写完了"（go ahead）
-包15  ACK         62→61  62字节
-```
-
-备注：这里 Sink 的字面意思是"数据汇入点"，在 rping 里就是客户端提前注册好的一块内存区域。
 
 ---
 
-**对照服务端日志理解每一步**
+对照服务端日志：
 
-```
+```bash
 日志: "recv completion"
 日志: "Received rkey 2095 addr 5b269382e5e0 len 64 from peer"
 → 对应包4，客户端用 Send 把自己的 RKey/VAddr 发给服务端
@@ -205,4 +205,7 @@ client DISCONNECT EVENT...
 → 对应包14，服务端通知客户端"写完了"
 ```
 
-总结：rping 里 Send 不传 ping 数据，专门用来**传递控制信息**（RKey/VAddr/通知信号），这是 Send 在 RDMA 编程里的典型用法：Send 触发对端 CPU 感知，适合传小块控制信息；Write/Read 传大块数据，对端 CPU 不感知。
+在 rping 的例子里，Send 不用来传 ping 数据，专门用来传控制信息（RKey/VAddr/通知信号），这是 Send 在 RDMA 编程里的典型用法。
+
+- Send 触发对端 CPU 感知，适合传小块控制信息；
+- Write/Read 传大块数据，对端 CPU 不感知。

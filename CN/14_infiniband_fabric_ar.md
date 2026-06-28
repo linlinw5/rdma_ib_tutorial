@@ -14,11 +14,9 @@
 
 ### 14.2 自适应路由的思路
 
-解决这个问题的思路并不复杂：既然 SM 在初始化时无法预知运行时的流量分布，那就把部分决策权下放给交换机，让它在转发每个包时，根据当前各 port 的实际负载状态来选择出口。
+解决这个问题的思路并不复杂：既然 SM 在初始化时无法预知运行时的流量分布，那就把部分决策权下放给交换机，让它在转发每个包时，根据当前各 port 的实际负载状态来选择出口。这便是自适应路由（Adaptive Routing，AR）的核心思想。
 
-这就是自适应路由（Adaptive Routing，AR）的核心思想。
-
-AR 并不是让 SM 退出路由决策，而是改变了 SM 与交换机之间的分工方式：
+**AR 并不是让 SM 退出路由决策，而是改变了 SM 与交换机之间的分工方式**：
 
 ```
 没有 AR：
@@ -33,7 +31,7 @@ SM 不再告诉交换机"去 LID X 走 port 3"，而是告诉它"去 LID X 可�
 
 交换机则在每次转发时，读取各候选 port 的实时 credit 或队列深度，选择当前最空闲的那个。
 
-因此，决策的时间粒度，从"子网初始化时"缩短到了"每个包转发时"。
+因此，**AR 让路由决策的时间粒度，从"子网初始化时"缩短到了"每个包转发时"**。
 
 ---
 
@@ -55,10 +53,11 @@ LID → AR Group ID → { port_1, port_2, port_3, ... }
 
 SM 通过 ARM（Adaptive Routing Manager）模块在子网初始化时扫描所有支持 AR 的交换机，识别出等价的上行链路，将它们归入同一个 AR group，然后把 group 配置写入交换机。之后 SM 不再参与逐包的转发决策，这部分完全由交换机硬件自主完成。
 
-在上一章的 spine-leaf 拓扑中，每个 Leaf switch 有 4 条上行链路分别连到 4 个 Spine，AR group 的配置大致如下：
+以上一章的 spine-leaf 拓扑为例：每个 Leaf switch 有 4 条上行链路分别连到 4 个 Spine，那么 AR group 的配置大致如下：
 
 ```
 Leaf1 AR Group 0：{ port1, port2, port3, port4 }   ← 4条上行等价链路
+
 LFT[lid_X] → Group 0    （所有跨 Leaf 的目标 LID 都指向这个 group）
 ```
 
@@ -68,19 +67,19 @@ LFT[lid_X] → Group 0    （所有跨 Leaf 的目标 LID 都指向这个 group�
 
 ### 14.4 AR 的代价：包乱序问题
 
-AR 并不是没有代价的。IB 协议在设计上保证了同一 QP 内的消息严格有序，发送方按顺序发出的包，接收方按同样的顺序收到。这个保证的前提是：同一条连接的所有包走同一条路径。
+**要让 AR 完美运行，并不是没有代价的**。在前面几章的分析中，我们知道：IB 协议在设计上保证了同一 QP 内的消息严格有序，发送方按顺序发出的包，接收方按同样的顺序收到。这个保证的前提是：同一条连接的所有包走同一条路径。
 
-AR 打破了这个前提。同一个 QP 的连续两个包，可能因为 port 负载的瞬时变化而走了不同的 Spine，经历不同的排队延迟，以乱序到达接收方。
+AR 打破了这个前提。在 AR 启用的情况下，同一个 QP 的连续两个包，可能因为 port 负载的瞬时变化而走了不同的 Spine，经历不同的排队延迟，以乱序到达接收方。
 
-为了支持 AR，HCA 需要具备包重排序能力（Packet Reordering），在接收端将乱序到达的包重新排列后再交给上层。这对 HCA 的硬件设计提出了额外要求，也是早期 IB 设备不支持 AR 的原因之一。现代 NVIDIA ConnectX 系列 HCA 均已支持包重排序，AR 才得以在生产环境中广泛部署。
+因此，为了支持 AR，HCA 需要具备包重排序能力（Packet Reordering），在接收端将乱序到达的包重新排列后再交给上层。这对 HCA 的硬件设计提出了额外要求，也是早期 IB 设备不支持 AR 的原因之一。现代 NVIDIA ConnectX 系列 HCA 均已支持包重排序，AR 才得以在生产环境中广泛部署。
 
-> AR 的转发决策发生在交换机处理每个数据包时，理论粒度为逐包（per-packet）。但由于 IB RC QP 的保序要求，实际部署中 HCA 需要具备包重排序能力，NVIDIA ConnectX 系列 HCA 均已支持。NVIDIA 的具体实现细节属于私有技术，是否在某些场景下以 flow(QP) 为粒度做保守决策，目前没有公开的完整说明。
+> AR 的转发决策发生在交换机处理每个数据包时，理论粒度为逐包（per-packet）。但由于 IB RC QP 的保序要求，实际部署中 HCA 需要具备包重排序能力。不过，NVIDIA 的具体实现细节属于私有技术，是否在某些场景下以 flow(QP) 为粒度做保守决策，目前我没有公开的完整说明。
 
 ---
 
 ### 14.5 实验测试
 
-接下来，我们通过实验观察 ar_ftree 与 ftree 在控制平面上的差异。不过有些遗憾的是，ibsim 的虚拟交换机并不支持 Adaptive Routing，AR 依赖 NVIDIA IB 交换机的私有扩展能力，ibsim 没有实现这部分。因此我们能观察到的，只限于 OpenSM 控制平面的行为，而看不到交换机数据平面的动态决策过程。尽管如此，这个实验本身也能说明一些重要的事情。
+接下来，我们通过实验观察 ar_ftree 与 ftree 在控制平面上的差异。不过有些遗憾的是，ibsim 并不支持 Adaptive Routing。AR 依赖 NVIDIA IB 交换机的私有扩展能力，ibsim 没有实现这部分。因此我们能观察到的，只限于 OpenSM 控制平面的行为，而看不到交换机数据平面的动态决策过程。
 
 首先，如往常一样启动 ibsim：
 
@@ -144,40 +143,29 @@ OpenSM $
 OpenSM $
 ```
 
-注意，关键日志输出如下：
+与上一章跑普通 ftree 时相比，日志中以下几行值得关注：
 
 ```bash
-fabric_dump_general_info:   - FatTree rank (roots to leaf switches): 2
-fabric_dump_general_info:   - Fabric has 4 switches at rank 0 (roots)
-fabric_dump_general_info:   - Fabric has 4 switches at rank 1 (4 of them leafs)
 AR Manager - Configuration cycle (number 1) completed successfully
 osm_ucast_mgr_process: ar_ftree tables configured on all switches
-osm_ar_calculate_pfrn: No fabric switch supports pFRN. Hence, avoid configuring pFRN
-SUBNET UP
-```
-
-与上一章跑普通 ftree 时相比，日志多出了两行：
-
-```
-AR Manager - Configuration cycle (number 1) completed successfully
 osm_ar_calculate_pfrn: No fabric switch supports pFRN. Hence, avoid configuring pFRN
 ```
 
 **第一行**说明 AR Manager（ARM）模块被激活并完成了一次配置周期。ARM 是 OpenSM 中负责 AR 配置的组件，它在路由计算完成后扫描 fabric 中所有的交换机，识别支持 AR 的设备，并向其写入 AR Group Table。"completed successfully"说明这个流程正常走完了。但是请注意："成功完成"只意味着流程没有报错，并不意味着 AR 配置真的生效了。
 
-**第二行**才是真正的结论：`No fabric switch supports pFRN`。pFRN（port-based Forwarding Route Notification）是 AR 的配套功能，ARM 通过查询这个能力位来判断交换机是否支持 AR。这里明确说明，fabric 中没有任何一台交换机声明了该能力。换句话说，ARM 扫描了所有虚拟交换机，发现它们全都不具备 AR 硬件能力，于是跳过了 AR Group Table 的写入，什么也没配置。
+**第三行**才是真正的结论：`No fabric switch supports pFRN`。pFRN（port-based Forwarding Route Notification）是 AR 的配套功能，这里明确说明，fabric 中没有任何一台交换机声明了该能力。换句话说，ARM 扫描了所有虚拟交换机，发现它们全都不具备 AR 硬件能力，于是跳过了 AR Group Table 的写入，什么也没配置。
 
-此时如果用 `ibroute` 查看各 Leaf switch 的转发表，会发现结果与普通 ftree 完全相同——这正是预期的结果，因为在没有 AR Group Table 的情况下，数据包仍然按照普通 LFT 转发，ar_ftree 退化成了 ftree。
+此时如果用 `ibroute` 查看各 Leaf switch 的转发表，会发现结果与普通 ftree 完全相同。这是符合预期的结果，因为在没有 AR Group Table 的情况下，数据包仍然按照普通 LFT 转发，ar_ftree 退化成了 ftree。
 
 ---
 
 ### 14.6 ibsim 的边界
 
-这个实验清楚地划出了 ibsim 能做什么、不能做什么。
+我们时间已经开始逐步逼近 ibsim 的能力边界了，后续的章节中还会看到很多类似的情况，因此这里我想特别谈一谈 ibsim 的限制。
 
 **能观察到的（控制平面）：**
 
-OpenSM 识别 fat-tree 拓扑结构、计算路由、生成 LFT、调用 ARM 模块、尝试配置 AR Group Table——这整个控制平面流程，在 ibsim 中都能完整运行和观察。日志里的拓扑识别信息（rank、leaf/root 数量）、ARM 的启动和运行记录，都是真实的控制平面行为。
+OpenSM 识别 fat-tree 拓扑结构、计算路由、生成 LFT、调用 ARM 模块、尝试配置 AR Group Table，这整个控制平面流程，在 ibsim 中都能完整运行和观察。日志里的拓扑识别信息（rank、leaf/root 数量）、ARM 的启动和运行记录，都是真实的控制平面行为。
 
 **观察不到的（数据平面）：**
 
@@ -195,10 +183,10 @@ OpenSM 识别 fat-tree 拓扑结构、计算路由、生成 LFT、调用 ARM 模
 
 ### 14.7 小结
 
-通过上一章和本章的实验，我们完整地走过了 IB 路由从静态到动态的演进路径。
+我们已经完整地走过了 IB 路由从静态到动态的演进路径。
 
-updn 和 ftree 都属于静态路由：SM 在子网初始化时计算路由、写入 LFT，之后路由表固定不变。两者的区别在于计算逻辑：updn 依赖通用的最短路径计数器，ftree 则显式感知 fat-tree 的层次结构，在对称拓扑下能产生更规则、更可预测的路由分布。
+updn 和 ftree 都属于静态路由：SM 在子网初始化时计算路由、写入 LFT，之后路由表固定不变。
 
-ar_updn 和 ar_ftree 在此基础上引入了自适应路由：SM 额外计算哪些 port 是等价的上行路径，通过 ARM 写入 AR Group Table；交换机在转发每个包时，从 group 内实时选择负载最低的 port。决策的时间粒度从"子网初始化时"缩短到了"每个包转发时"，这是应对 AI 训练场景下突发性流量不均衡的根本手段。
+ar_updn 和 ar_ftree 引入了自适应路由：SM 额外计算哪些 port 是等价的上行路径，通过 ARM 写入 AR Group Table；交换机在转发时，从 group 内实时选择负载最低的 port。这是应对 AI 训练场景下突发性流量不均衡的根本手段。
 
-ibsim 让我们完整观察了控制平面的行为，也清楚地标出了它的边界。AR 真正的价值体现在数据平面：当 AllReduce、All-to-All 等集合通信在数千个 GPU 之间同时进行时，AR 对实时流量的感知和动态均衡，才是 IB 网络能够充分发挥能力的关键所在。
+AR 真正的价值体现在数据平面：当 AllReduce、All-to-All 等集合通信在数千个 GPU 之间同时进行时，AR 对实时流量的感知和动态均衡，才是 IB 网络能够充分发挥能力的关键所在。

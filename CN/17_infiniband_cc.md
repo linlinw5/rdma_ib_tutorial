@@ -4,17 +4,19 @@
 
 到这里，我们要触碰一个很多同行一开始会觉得矛盾的问题：**IB 不是天生无损吗？链路层的 credit 流控不是已经保证不丢包了吗？那还要"拥塞控制（Congestion Control，CC）"干什么？**
 
-如果你接触过 SAN 网络，就不会感到奇怪：SAN 网络运维中，最头疼的问题，就是拥塞（Slow drain）。所以“拥塞”是无损网络的共性问题。
+如果你接触过 SAN 网络，就不会感到奇怪：SAN 网络运维中，最头疼的问题，就是拥塞（Slow drain）。因此，“拥塞”是无损网络的共性问题。
 
-要搞明白“拥塞控制”是什么，那就有必要先澄清一个概念上误区：流控 ≠ 拥塞控制。
+要搞明白无损网络里的“拥塞控制”是什么，那就有必要先澄清一个概念上误区：流控 ≠ 拥塞控制。
 
 **链路层流控（flow control）解决的是"不丢包"。** 我们在介绍 IB 交换机原理时说过：IB 交换机要往下一跳发包，必须先拿到对方的 credit（确认有空闲缓冲）。没有 credit 就不发。于是，IB 包永远不会因为缓冲溢出而被丢弃。这是**逐跳（hop-by-hop）、链路级**的机制。
 
 但"不丢包"不等于"不拥塞"。设想一个经典的 **incast（多打一）** 场景：成百上千个 GPU 在 AllReduce 的某个阶段同时往一个节点发梯度。目的端的那条链路带宽是有限的，吃不下这么多流量，于是：
 
 1. 目的端口的缓冲迅速被填满，它停止给上游发 credit；
-2. 上游交换机的缓冲也开始堆积，于是它也停止给**它的**上游发 credit；
+2. 上游交换机的缓冲也开始堆积，于是它也停止给它的上游发 credit；
 3. 这个"缓冲填满 → 收回 credit"的背压（backpressure）沿着路径**一跳一跳往源头方向蔓延**...
+
+![IB congestion](../assets/ib_cc.jpeg)
 
 结果就是无损网络里臭名昭著的 **拥塞扩散（congestion spreading）/ 拥塞树（congestion tree）**。更糟的是它会殃及无辜：**那些根本不发往热点、只是恰好共享了沿途某个缓冲的"过路流量"，也会被一起堵死**，这就是所谓的**受害者流量（victim flow）**。
 
@@ -45,7 +47,7 @@ IB CC 会努力区分"真正的拥塞根源端口（root）"和"只是被背压�
 
 **第三步：源端降速**
 
-源端 HCA 收到 BECN 后，查询本地的 CCT（Congestion Control Table）—— 这张表由 CCM 预先写入，表中每一项对应一个包间延迟值。每收到一次 BECN，HCA 就将 CCT 的索引向后增加一步（增量为 CCTI_Increase，同样由 CCM 设定），从而取到更大的包间延迟，实际效果是降低注入速率。
+源端 HCA 收到 BECN 后，查询本地的 CCT（Congestion Control Table），这张表由 CCM 预先写入，表中每一项对应一个包间延迟值。每收到一次 BECN，HCA 就将 CCT 的索引向后增加一步（增量为 CCTI_Increase，同样由 CCM 设定），从而取到更大的包间延迟，实际效果是降低注入速率。
 
 **第四步：自动恢复**
 
@@ -68,15 +70,13 @@ CCM 作为全局管理者，负责向所有 HCA 写入 CCT 内容、配置交换
 
 ## 17.3 CCM（Congestion Control Manager）
 
-在 IB 架构中，OpenSM 里负责 CC 的是 **CCM（拥塞控制管理器）**，它有些特殊，走的是一套独立的管理类：
-
-- **管理类 0x21（Congestion Control class）**：CC 的配置不走前几章一直用的 SMP（子网管理包，类 0x01），而是走专门的拥塞控制管理类。
+在 IB 架构中，OpenSM 里负责 CC 的是 **CCM（拥塞控制管理器）**，它有些特殊，走的是一套独立的管理类：**管理类 0x21（Congestion Control class）**。因此，CC 的配置消息用的不是 SMP（子网管理包，类 0x01），而是一个专门的拥塞控制管理类。
 
 ## 17.4 CCM 配置选项
 
-这里要特别说明一点：OpenSM 的拥塞控制其实有两套实现：一套是上游社区的通用版，另一套是 **NVIDIA 私有的 PPCC（Programmable Congestion Control，可编程拥塞控制）**。因为我们最初安装 OpenSM 时，用的是 NVIDIA 的 apt 源，所以下面摘录的这段配置是来自 MLNX/NVIDIA 版 OpenSM，即 PPCC 这一套。注意它的标题里明确写着 **EXPERIMENTAL**，说明这还是个比较新、仍在演进中的特性。
+我们最初安装 OpenSM 时用的是 NVIDIA 的 apt 源，下面摘录的这段配置是来自这台 MLNX/NVIDIA 版 OpenSM。注意它的标题里明确写着 **EXPERIMENTAL**，说明这还是个仍在演进中的特性。
 
-PPCC 依赖 NVIDIA 较新硬件（ConnectX-6 Dx 及以后的网卡、Quantum 系列交换机）里的可编程拥塞控制引擎，ibsim 的虚拟设备并不具备这个能力。因此本章只能对 CCM 部分的配置摘录和官方注释做一次浏览，帮助大家对"这套东西长什么样、由哪些部分构成"建立一个概念即可。
+CC 依赖硬件支持，ibsim 的虚拟设备并不具备这个能力。因此本章只能对 CCM 部分的配置摘录和官方注释做一次浏览，帮助大家建立一个概念即可。
 
 CCM 部分的主要配置摘录如下：
 
@@ -124,29 +124,29 @@ cc_key_lease_period 60
 cc_key_protect_bit 1
 ```
 
-把核心的几项串起来看，NVIDIA PPCC 的配置是一个**三层结构**：
+把核心的几项串起来看，NVIDIA 的 CC 配置是一个**三层结构**：
 
-```
+```bash
 opensm.conf
   ├─ mlnx_congestion_control 2          # 总开关（0 忽略 / 1 禁用 / 2 启用）
-  ├─ congestion_control_policy_file ──► 策略文件（指向一个独立文件）
-  │                                         └─ 用 ca_algo_import / algo 块，把每个算法关联到一个 profile，
-  │                                            再用 port-group 圈定它作用于哪些端口
+  ├─ congestion_control_policy_file     # 策略文件（指向一个独立文件）
+  │                                     #   └─ 用 ca_algo_import / algo 块，把每个算法关联到一个 profile，
+  │                                     #      再用 port-group 圈定它作用于哪些端口
   └─ ppcc_algo_dir /etc/opensm/ppcc_algo_dir
-                                            └─ 算法 profile 文件，内含具体的 PPCC 参数，
-                                               如 (BW_G,400)、(ALPHA,3932)、(AI,36)、
-                                               (HAI,1200) 等“降速/恢复曲线”系数
+                                        #   └─ 算法 profile 文件，内含具体的 PPCC 参数，
+                                        #      如 (BW_G,400)、(ALPHA,3932)、(AI,36)、
+                                        #      (HAI,1200) 等“降速/恢复曲线”系数
 ```
 
-- **第一层（开关）**：`mlnx_congestion_control` 决定开不开，`ppcc_algo_dir` 指向算法库目录；
-- **第二层（策略）**：`congestion_control_policy_file` 指向的策略文件，负责"把哪种算法、用什么参数，应用到哪些端口"；
-- **第三层（算法）**：放在 `ppcc_algo_dir` 里的 profile，定义某个算法的具体行为参数。
+- **开关**：`mlnx_congestion_control` 决定开不开，`ppcc_algo_dir` 指向算法库目录；
+- **策略**：`congestion_control_policy_file` 指向的策略文件，负责"把哪种算法、用什么参数，应用到哪些端口"；
+- **算法**：放在 `ppcc_algo_dir` 里的 profile，定义某个算法的具体行为参数。
 
 ---
 
 ## 17.5 一面镜子：FC SAN 的拥塞管理 vs IB CC
 
-本章开头就说过：SAN 里最头疼的 slow drain，和 IB 的拥塞扩散，本质是同一个病：无损 + credit 背压带来的拥塞蔓延与 victim 受害。
+本章开头就说过：SAN 里最头疼的 slow drain。**SAN 和 IB 的拥塞扩散，本质是同一个病：无损 + credit 背压带来的拥塞蔓延与 victim 受害**。
 
 IB 公开的资料中，关于 CC 的内容比较分散，没有成体系的介绍。这里我想借 Cisco MDS SAN 交换机在这方面公开的信息来做个对比。
 
@@ -154,7 +154,7 @@ IB 公开的资料中，关于 CC 的内容比较分散，没有成体系的介�
 https://www.cisco.com/c/en/us/td/docs/dcn/mds9000/sw/9x/configuration/interfaces/cisco-mds-9000-nx-os-interfaces-configuration-guide-9x/congestion_avoidance_isolation.html
 ```
 
-Cisco 的 CC 体系可以从 **"根因 — 检测 — 响应"** 三层来理解：
+Cisco SAN 的 CC 体系可以从 **"根因 — 检测 — 响应"** 三层来理解：
 
 ### 根因：先把"为什么堵"分清楚
 
@@ -166,22 +166,22 @@ Cisco 把 SAN 拥塞的根因明确分成三类，分而治之：
 
 ### 检测：Port Monitor（PMON）盯计数器
 
-检测由 **Port Monitor（PMON，新版整合进 SMA -- Smart Monitoring and Alerting）** 承担。它持续统计几个关键计数器（包括`tx-wait`、`credit-not-available`、`slowport-delay`、`tx-overutilization`等）每个计数器可设 **warning / alarm 两档阈值**。阈值一旦触发，就执行 **portguard action**，这是"检测驱动响应"的接口点。
+检测由 **Port Monitor（PMON，新版叫 SMA -- Smart Monitoring and Alerting）** 承担。它持续统计几个关键计数器（包括`tx-wait`、`credit-not-available`、`slowport-delay`、`tx-overutilization`等）每个计数器可设 **warning / alarm 两档阈值**。阈值一旦触发，就执行 **portguard action**，这是"检测驱动响应"的接口点。
 
 ### 响应：四类手段、三条路线
 
-- **Avoidance（丢帧止血）**：帧积压或 credit 归零超时后直接丢弃。比较激进，但能立刻阻止拥塞扩散（FCoE 上对应 PFC pause 超时丢帧）。
-- **Isolation（隔离保护）**：不丢帧，把慢设备"关进笼子"。把一条 ISL(Inter Switch Link) 切成 4 条独立 VL(Virtual Lane)，各有独立 credit 池；PMON 触发后由 FPM(Fabric Performance Monitor) 把该设备的流量移进低优先级 VL，正常设备不受影响，满足条件后自动恢复。(有些 IB 的 virtual lane 的味道了)
+- **Avoidance（丢帧止血）**：帧积压或 credit 归零超时后直接丢弃。虽然比较激进，但能立刻阻止拥塞扩散（FCoE 上对应 PFC pause 超时丢帧）。
+- **Isolation（隔离保护）**：不丢帧，把慢设备"关进笼子"。把一条 ISL(Inter Switch Link) 切成 4 条独立 VL(Virtual Lane)，各有独立 credit 池；PMON 触发后由 FPM(Fabric Performance Monitor) 把该设备的流量移进低优先级 VL，正常设备不受影响，满足条件后自动恢复。(有些 IB 的 virtual lane 的味道了，但仅限于 ISL 链路)
 - **Notification + Rate Limiting**：
   - **Fabric Performance Impact Notifications(FPIN)**：交换机向 HBA 发 ELS(Extended Link Services) 通知帧，告知其对端拥塞，HBA 驱动自行调整（**端点协同**）；
   - **Dynamic Ingress Rate Limiting(DIRL)**：交换机直接在 ingress 端口动态限速，按比例降、再逐步恢复，**不依赖 HBA 配合**（**网络强制**）；
   - **Static Ingress Port Rate Limiting**：预防性的静态配置限速。
 
-这几条可组合使用，全部由 FPM/SMA 统一管理，粒度可以细到 **pwwn + VSAN**。
+这几条可组合使用，全部由 FPM/SMA 统一管理。
 
 ### FC vs IB 拥塞管理
 
-来个对比分析。不过，我想说两者本质都是无损网络，可以相互借鉴，因此随着时间的推移，两者最终可能会趋同。
+来个对比分析。不过我想说，两者本质都是无损网络，可以相互借鉴，因此随着时间的推移，两者最终可能会趋同。
 
 | 层次            | Cisco MDS（FC SAN）                                 | InfiniBand CC                                                                           |
 | --------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -198,8 +198,8 @@ Cisco 把 SAN 拥塞的根因明确分成三类，分而治之：
 
 ## 17.6 小结
 
-**拥塞控制和流控是两回事。** 链路层 credit 流控保证"不丢包"，却会让拥塞沿背压一跳跳扩散、殃及过路的 victim flow。要从根上解决，必须让制造拥塞的**源头降速**，这就是端到端、闭环的拥塞控制（CC）。
+**拥塞控制和流控是两回事**：链路层 credit 流控保证"不丢包"，却会让拥塞沿背压一跳跳扩散、殃及过路的 victim flow。要从根上解决，必须让制造拥塞的**源头降速**，这就是端到端、闭环的拥塞控制（CC）。
 
-**IB CC 是一个三角闭环**：交换机检测到拥塞，给过路包置 **FECN**；目的端把它反射成 **BECN**（或专门的 CNP）回送源端；源端据 **CCT/CCTI** 加大发包间隔、降低注入速率，拥塞缓解后再由定时器平滑恢复。整套参数由 OpenSM 的 CC Manager 经独立的管理类 0x21 集中下发。
+**IB CC 的三角闭环**：交换机检测到拥塞，给过路包置 **FECN**；目的端把它反射成 **BECN**（或专门的 CNP）回送源端；源端据 **CCT/CCTI** 加大发包间隔、降低注入速率，拥塞缓解后再由定时器平滑恢复。整套参数由 OpenSM 的 CC Manager 经独立的管理类 0x21 集中下发。
 
 至此，IB 控制平面的"隔离（P_Key）— 分级（SL/VL）— 控拥（CC）"三件套就走完了。它们共同的特征是：**机制由网络垂直整合、由子网管理器集中标定下发**，这与以太网世界里逐台设备、分布式拼装的做法形成了鲜明对照。

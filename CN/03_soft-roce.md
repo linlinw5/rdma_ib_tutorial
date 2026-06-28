@@ -307,7 +307,7 @@ hca_id: rxe0
                         GID[  0]:               fe80::250:56ff:fea7:7d03, RoCE v2
                         GID[  1]:               ::ffff:10.1.16.62, RoCE v2
 
-# 可以看到有两个GID生成：
+# 可以看到有两个GID：
 # - GID 0：等同于 link-local IPv6 地址，由网卡 MAC 地址通过 EUI-64 规则生成；
 # - GID 1：这是 IPv4-mapped IPv6 地址，格式是 ::ffff:<IPv4>，对应本机网卡配置的 IPv4 地址 10.1.16.62；
 ```
@@ -388,10 +388,10 @@ expert@k8s-62:~$ ib_write_bw -d rxe0 --report_gbits 10.1.16.61
 # #bytes = 65536（64KB）
 # 每次 RDMA Read 操作传输的数据量，这是 ib_read_bw 的默认 message size
 
-# iterations = 1000
-# 总共执行了 1000 次 RDMA Read 操作
+# iterations = 5000
+# 总共执行了 5000 次 RDMA Read 操作
 
-# avg_bw = (65536 bytes × 1000 次 × 8 bits) / 总耗时
+# avg_bw = (65536 bytes × 5000 次 × 8 bits) / 总耗时
 
 # MsgRate = 0.000920 Mpps = 920 ops/s
 # 每秒完成的 RDMA Read 次数
@@ -404,12 +404,12 @@ expert@k8s-62:~$ ib_write_bw -d rxe0 --report_gbits 10.1.16.61
 
 `libibverbs` 自带最简单的 RDMA 连通性验证工具，可以做 Send/Recv pingpong 测试，主要目的是验证 RDMA 链路是否正常，顺带测延迟。
 
-Send/Recv 是**双边操作**，发送方 post Send，接收方必须提前 post Recv 才能收到，两边都要参与。这和 RDMA Write/Read 的单边语义完全不同。`ibv_rc_pingpong` 验证的其实是整个 Send/Recv 路径是否通，包括 QP 状态机、GID 解析、AH（Address Handle）构建是否正确。
+注意，RDMA Send 是**双边操作**，发送方 post Send，接收方必须提前 post Recv 才能收到，两边都要参与。这和 RDMA Write/Read 的单边语义完全不同。`ibv_rc_pingpong` 验证的其实是整个 Send/Recv 路径是否通，包括 QP 状态机、GID 解析、AH（Address Handle）构建是否正确。
 
 ```bash
 # RC pingpong 延迟  ibv_rc_pingpong -d <dev> -g 1
 # UC pingpong 延迟  ibv_uc_pingpong -d <dev> -g 1
-# UDP pingpong 延迟 ibv_ud_pingpong -d <dev> -g 1
+# UD pingpong 延迟 ibv_ud_pingpong -d <dev> -g 1
 # `-g 1` 指定 GID index 1（IPv4-mapped GID）
 
 # 服务端
@@ -568,6 +568,8 @@ destroy cm_id 0x5617d13d2c20
 
 
 
+
+
 # 客户端
 expert@k8s-62:~$ rping -c -a 10.1.16.61 -C 5 -v
 # 每轮起始字母往后移一位，是 rping 故意做的，用来验证每次读到的数据确实是新的，不是缓存
@@ -585,7 +587,7 @@ client DISCONNECT EVENT...
 
 | Type / Object              | Support |
 | -------------------------- | ------- |
-| SEND / RECV                | ✓       |
+| RDMA SEND                  | ✓       |
 | RDMA READ                  | ✓       |
 | RDMA WRITE                 | ✓       |
 | Atomic (CAS / FAA)         | ✓       |

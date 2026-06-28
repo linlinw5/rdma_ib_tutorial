@@ -1,4 +1,4 @@
-This is an article I wrote while preparing for the NCP-AIN exam, which I am including here as an appendix for your reference.
+This is an article I wrote while preparing for the NCP-AIN exam, which I am including here as preface for your reference.
 
 # The Historical Cycle of AI Networking: The Battle of Semantics and ATM's Unfinished Business
 

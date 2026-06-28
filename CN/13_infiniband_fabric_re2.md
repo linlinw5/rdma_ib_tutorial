@@ -4,9 +4,7 @@
 
 通常，在 IB 中提到 Fat-Tree，说的一种拓扑结构，它是高性能计算（HPC）和 AI 训练集群中最主流的网络架构，其核心设计目标是提供无阻塞或低阻塞的全互联能力。
 
-Fat-Tree 得名于"越靠近核心链路越粗"的设计直觉，但在现代实现中通常指 Clos 网络的一种变体。
-
-其核心目标是：在用多级普通交换机构建大规模互联网络时，仍能为任意端节点对提供无阻塞（non-blocking）的通信路径，即无论有多少 HCA 同时发起通信，都不会因为上行链路带宽不足而产生收敛瓶颈。
+Fat-Tree 得名于"越靠近核心链路越粗"的设计直觉，但在现代实现中通常指 Clos 网络的一种变体。其核心目标是：在用多级普通交换机构建大规模互联网络时，仍能为任意端节点对提供无阻塞（non-blocking）的通信路径，即无论有多少 HCA 同时发起通信，都不会因为上行链路带宽不足而产生收敛瓶颈。
 
 ![Fat-Tree](../assets/fat_tree.svg)
 
@@ -416,7 +414,9 @@ OpenSM $
 OpenSM $
 ```
 
-从 SM 的启动日志可以看到，**ftree 成功识别了两层结构**，知道 Spine 是 rank0（root），Leaf 是 rank1。而 updn 需要手工指定 root 列表，并且只做 BFS 层级标记，不识别 fat-tree 的树结构。
+> 从 SM 的启动日志可以看到，**ftree 成功识别了两层结构**，知道 Spine 是 rank0（root），Leaf 是 rank1。
+>
+> 这与 updn 形成鲜明对比，updn 必须手动指定 root，而 ftree 则不需要。
 
 ibsim dump 如下：
 
@@ -611,10 +611,10 @@ Ca 2 "Hca48"    nodeguid 10002d sysimgguid 10002d
 两套算法，LID 分配结果都是相同的，因为 LID 分配是发现阶段的工作，总结如下：
 
 ```
-Leaf1下： Hca15=lid2,  Hca16=lid5,  Hca17=lid8,  Hca18=lid9
-Leaf2下： Hca25=lid17, Hca26=lid18, Hca27=lid19, Hca28=lid20
-Leaf3下： Hca35=lid21, Hca36=lid22, Hca37=lid23, Hca38=lid24
-Leaf4下： Hca45=lid25, Hca46=lid26, Hca47=lid27, Hca48=lid28
+Leaf1： Hca15=lid2,  Hca16=lid5,  Hca17=lid8,  Hca18=lid9
+Leaf2： Hca25=lid17, Hca26=lid18, Hca27=lid19, Hca28=lid20
+Leaf3： Hca35=lid21, Hca36=lid22, Hca37=lid23, Hca38=lid24
+Leaf4： Hca45=lid25, Hca46=lid26, Hca47=lid27, Hca48=lid28
 ```
 
 所有 Leaf 与 Spine 相连的端口映射：port1=Spine1, port2=Spine2, port3=Spine3, port4=Spine4
@@ -689,7 +689,7 @@ Leaf4下： Hca45=lid25, Hca46=lid26, Hca47=lid27, Hca48=lid28
 [Hca35]Sp1 [Hca36]Sp2 [Hca37]Sp3 [Hca38]Sp4    ← 去Leaf3
 ```
 
-通过对比，可以从两个维度来理解两种算法的差异：
+可以从两个维度来理解两种算法的差异：
 
 **从单个 Leaf 的视角看**，两种算法都实现了均衡：去往同一目标 Leaf 的4个 HCA，被分散到了4个不同的 Spine，每个 Spine 各承担一条路径。这一点 updn 和 ftree 并无本质区别。
 
@@ -706,4 +706,8 @@ updn 的 LFT 由 OpenSM 通用路由管理器写入，当存在等价路径时�
 
 ftree 则有自己独立的 LFT 写入逻辑，以每个目标 HCA 为起点向上递归，当存在等价路径时，选择当前承载下行路由数最少的 Spine 方向。在我们这个完全对称的拓扑中，处理每个目标 HCA 时各 Spine 的负载状态完全相同，所以每次都选了同一个 Spine，呈现出全局一致的映射关系。需要指出的是，这种一致性是**对称拓扑与均衡算法共同作用的结果**，而非 ftree 的硬编码规则，如果拓扑不对称，ftree 的结果同样会因 Leaf 而异。
 
-不过，本章中涉及的两种算法有一个共同的**根本局限：路由表在子网初始化时由 SM 静态计算写入，此后不再改变**。当实际流量出现不均衡时，无论哪种算法都无法在运行时做出调整。这正是下一章的自适应路由（adaptive routing）需要解决的问题。
+## 13.4 新的问题
+
+最后，我想提出一个问题来作为本章的收尾。我们目前为止接触到的路由算法，都存在一个**根本局限：路由表在子网初始化时由 SM 静态计算写入，此后不再改变**。那么当网络中的实际流量出现不均衡时，它们能否在运行时做出调整呢？
+
+这正是下一章的自适应路由（adaptive routing）需要解决的问题。

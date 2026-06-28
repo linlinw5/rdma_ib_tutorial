@@ -1,0 +1,67 @@
+<svg viewBox="0 0 760 660" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif">
+  <rect x="0" y="0" width="760" height="660" fill="#FAFAF8"/>
+
+  <defs>
+    <marker id="flowHead" markerUnits="userSpaceOnUse" markerWidth="17" markerHeight="15" refX="13" refY="7.5" orient="auto">
+      <path d="M0,0 L16,7.5 L0,15 Z" fill="#C00000"/>
+    </marker>
+  </defs>
+
+  <!-- ===================== LEVEL GUIDES ===================== -->
+  <g stroke="#E3E3E0" stroke-width="1.5" stroke-dasharray="5 6">
+    <line x1="40" y1="110" x2="740" y2="110"/>
+    <line x1="40" y1="335" x2="740" y2="335"/>
+    <line x1="40" y1="560" x2="740" y2="560"/>
+  </g>
+  <g font-size="13" fill="#9a9a9a">
+    <text x="44" y="96">Level 0 · root</text>
+    <text x="44" y="321">Level 1 · 1 hop</text>
+    <text x="44" y="546">Level 2 · 2 hops (far corner)</text>
+  </g>
+
+  <!-- ===================== PHYSICAL LINKS (ring edges) ===================== -->
+  <g stroke="#9a9a9a" stroke-width="2.5">
+    <line x1="440" y1="152" x2="555" y2="293"/>  <!-- A-B -->
+    <line x1="320" y1="152" x2="205" y2="293"/>  <!-- A-D -->
+    <line x1="555" y1="377" x2="440" y2="518"/>  <!-- B-C -->
+    <line x1="205" y1="377" x2="320" y2="518"/>  <!-- D-C -->
+  </g>
+
+
+  <!-- ===================== SWITCH NODES ===================== -->
+  <g>
+    <!-- root badge over SwA -->
+    <rect x="332" y="34" width="96" height="26" rx="13" fill="#FFD24D" stroke="#CC9A06" stroke-width="2"/>
+    <text x="380" y="52" text-anchor="middle" font-size="14" font-weight="700" fill="#6b5200">★ ROOT</text>
+
+    <!-- SwA top (root) -->
+    <rect x="320" y="68" width="120" height="84" rx="14" fill="#9DC3E6" stroke="#2E75B6" stroke-width="2.5"/>
+    <text x="380" y="118" text-anchor="middle" font-size="23" font-weight="700" fill="#1f3a5f">SwA</text>
+    <!-- SwB right -->
+    <rect x="555" y="293" width="120" height="84" rx="14" fill="#9DC3E6" stroke="#2E75B6" stroke-width="2.5"/>
+    <text x="615" y="343" text-anchor="middle" font-size="23" font-weight="700" fill="#1f3a5f">SwB</text>
+    <!-- SwD left -->
+    <rect x="85" y="293" width="120" height="84" rx="14" fill="#9DC3E6" stroke="#2E75B6" stroke-width="2.5"/>
+    <text x="145" y="343" text-anchor="middle" font-size="23" font-weight="700" fill="#1f3a5f">SwD</text>
+    <!-- SwC bottom -->
+    <rect x="320" y="518" width="120" height="84" rx="14" fill="#9DC3E6" stroke="#2E75B6" stroke-width="2.5"/>
+    <text x="380" y="568" text-anchor="middle" font-size="23" font-weight="700" fill="#1f3a5f">SwC</text>
+  </g>
+
+  <!-- Added curved forbidden path: SwB -> SwC -> SwD -->
+  <path d="M615 335
+           C615 430, 500 515, 380 515
+           S145 430, 145 335"
+        fill="none"
+        stroke="#C00000"
+        stroke-width="4"
+        stroke-dasharray="10 7"
+        marker-end="url(#flowHead)"/>
+
+  <!-- Red X on the curved path -->
+  <g stroke="#C00000" stroke-width="4" stroke-linecap="round">
+    <line x1="367" y1="500" x2="393" y2="526"/>
+    <line x1="393" y1="500" x2="367" y2="526"/>
+  </g>
+
+</svg>

@@ -1,0 +1,80 @@
+<svg viewBox="0 0 1100 710" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif">
+  <!-- background -->
+  <rect x="0" y="0" width="1100" height="710" fill="#FAFAF8"/>
+
+  <!-- ===================== LAYER BRACKET CONNECTORS ===================== -->
+  <!-- nested: DataLink (Eth..FCS) > Network (IP..ICRC) > Transport (UDP..ICRC) -->
+  <g fill="none" stroke-width="3" stroke-linecap="round">
+    <!-- Data Link Layer (green) : Eth left=60, FCS right=1026 -->
+    <g stroke="#548235">
+      <path d="M 60,190 V 624 Q 60,640 76,640 H 413"/>
+      <path d="M 1026,190 V 624 Q 1026,640 1010,640 H 673"/>
+    </g>
+    <!-- Network Layer (gray) : IP left=190, ICRC right=928 -->
+    <g stroke="#808080">
+      <path d="M 190,190 V 504 Q 190,520 206,520 H 439"/>
+      <path d="M 928,190 V 504 Q 928,520 912,520 H 679"/>
+    </g>
+    <!-- Transport Layer (orange) : UDP left=308, ICRC right=928 -->
+    <g stroke="#ED7D31">
+      <path d="M 308,190 V 384 Q 308,400 324,400 H 498"/>
+      <path d="M 928,190 V 384 Q 928,400 912,400 H 738"/>
+    </g>
+  </g>
+
+  <!-- ===================== LAYER LABEL BOXES ===================== -->
+  <rect x="498" y="372" width="240" height="56" rx="14" fill="#FCE4CE" stroke="#ED7D31" stroke-width="2.5"/>
+  <text x="618" y="408" text-anchor="middle" font-size="22" font-weight="600" fill="#333">Transport Layer</text>
+
+  <rect x="439" y="492" width="240" height="56" rx="14" fill="#EDEDED" stroke="#808080" stroke-width="2.5"/>
+  <text x="559" y="528" text-anchor="middle" font-size="22" font-weight="600" fill="#333">Network Layer</text>
+
+  <rect x="413" y="612" width="260" height="56" rx="14" fill="#E2EFDA" stroke="#548235" stroke-width="2.5"/>
+  <text x="543" y="648" text-anchor="middle" font-size="22" font-weight="600" fill="#333">Data Link Layer</text>
+
+  <!-- ===================== PACKET FIELD BOXES ===================== -->
+  <!-- size (top) + name (below) -->
+
+  <!-- Eth Header (green) -->
+  <rect x="60" y="60" width="122" height="130" rx="16" fill="#A9D08E" stroke="#548235" stroke-width="2.5"/>
+  <text x="121" y="99"  text-anchor="middle" font-size="17" font-weight="500" fill="#3d5e22">14 Bytes</text>
+  <text x="121" y="127" text-anchor="middle" font-size="20" font-weight="600" fill="#2b2b2b">Eth</text>
+  <text x="121" y="155" text-anchor="middle" font-size="20" font-weight="600" fill="#2b2b2b">Header</text>
+
+  <!-- IP Header (gray) -->
+  <rect x="190" y="60" width="110" height="130" rx="16" fill="#D9D9D9" stroke="#808080" stroke-width="2.5"/>
+  <text x="245" y="99"  text-anchor="middle" font-size="17" font-weight="500" fill="#555">20 Bytes</text>
+  <text x="245" y="127" text-anchor="middle" font-size="20" font-weight="600" fill="#2b2b2b">IP</text>
+  <text x="245" y="155" text-anchor="middle" font-size="20" font-weight="600" fill="#2b2b2b">Header</text>
+
+  <!-- UDP Header (orange) -->
+  <rect x="308" y="60" width="116" height="130" rx="16" fill="#F5A623" stroke="#C77F0A" stroke-width="2.5"/>
+  <text x="366" y="99"  text-anchor="middle" font-size="17" font-weight="500" fill="#6b4a00">8 Bytes</text>
+  <text x="366" y="127" text-anchor="middle" font-size="20" font-weight="600" fill="#2b2b2b">UDP</text>
+  <text x="366" y="155" text-anchor="middle" font-size="20" font-weight="600" fill="#2b2b2b">Header</text>
+
+  <!-- BTH (light yellow) -->
+  <rect x="432" y="60" width="104" height="130" rx="16" fill="#FFF2CC" stroke="#C9A227" stroke-width="2.5"/>
+  <text x="484" y="113" text-anchor="middle" font-size="17" font-weight="500" fill="#6b5800">12 Bytes</text>
+  <text x="484" y="145" text-anchor="middle" font-size="22" font-weight="600" fill="#2b2b2b">BTH</text>
+
+  <!-- ETH (light yellow) -->
+  <rect x="544" y="60" width="104" height="130" rx="16" fill="#FFF2CC" stroke="#C9A227" stroke-width="2.5"/>
+  <text x="596" y="113" text-anchor="middle" font-size="17" font-weight="500" fill="#6b5800">Var Bytes</text>
+  <text x="596" y="145" text-anchor="middle" font-size="22" font-weight="600" fill="#2b2b2b">ETH</text>
+
+  <!-- Payload (blue) -->
+  <rect x="656" y="60" width="168" height="130" rx="16" fill="#9DC3E6" stroke="#2E75B6" stroke-width="2.5"/>
+  <text x="740" y="113" text-anchor="middle" font-size="17" font-weight="500" fill="#1f4e79">Var Bytes</text>
+  <text x="740" y="145" text-anchor="middle" font-size="22" font-weight="600" fill="#2b2b2b">Payload</text>
+
+  <!-- ICRC (light yellow) -->
+  <rect x="832" y="60" width="96" height="130" rx="16" fill="#FFF2CC" stroke="#C9A227" stroke-width="2.5"/>
+  <text x="880" y="113" text-anchor="middle" font-size="17" font-weight="500" fill="#6b5800">4 Bytes</text>
+  <text x="880" y="145" text-anchor="middle" font-size="22" font-weight="600" fill="#2b2b2b">ICRC</text>
+
+  <!-- FCS (green) -->
+  <rect x="936" y="60" width="90" height="130" rx="16" fill="#A9D08E" stroke="#548235" stroke-width="2.5"/>
+  <text x="981" y="113" text-anchor="middle" font-size="17" font-weight="500" fill="#3d5e22">4 Bytes</text>
+  <text x="981" y="145" text-anchor="middle" font-size="22" font-weight="600" fill="#2b2b2b">FCS</text>
+</svg>

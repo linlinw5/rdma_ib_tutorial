@@ -20,16 +20,7 @@ InfiniBand 把网络的职责划分成若干层，每一层负责一类特定的
 | 链路层（Link）      | 子网内转发、流控、QoS         | LRH、VCRC        | 交换机          |
 | 物理层（Physical）  | 电/光信号传输                 | —                | 线缆 / 收发器   |
 
-一个完整的 IB 数据包，字段平铺拼接如下：
-
-```
-┌─────────┬──────────┬──────────┬──────────────────┬───────────────┬─────────────┬─────────────┐
-│   LRH   │   GRH    │   BTH    │       ETH        │    Payload    │    ICRC     │    VCRC     │
-├─────────┼──────────┼──────────┼──────────────────┼───────────────┼─────────────┼─────────────┤
-│  Link   │ Network  │Transport │Extended transport│  Upper-layer  │ end-to-end  │ link-level  │
-│  layer  │  layer   │  layer   │    header(s)     │     data      │     CRC     │     CRC     │
-└─────────┴──────────┴──────────┴──────────────────┴───────────────┴─────────────┴─────────────┘
-```
+![IB Layer](../assets/ib_packet_layers.svg)
 
 备注：GRH 和 ETH 是可选的，其中 ETH（Extended Transport Headers）还可以叠加，具体是哪些 ETH 取决于操作类型：
 
@@ -136,15 +127,11 @@ VCRC 和 ICRC 的分工到这里就完整了：
 
 如果说链路层和网络层解决的是"包怎么从一个端口到另一个端口"，那么传输层解决的是"两个分处不同地址空间的应用，怎么建立起端到端的通信"。它对应包里的 **BTH（Base Transport Header，基础传输头）和 ETH（Extended Transport Header，扩展传输头）**，由网卡硬件处理。
 
-![BTH](../assets/IB_BTH_structure.svg)
-
 先回顾一下传输层的几个基本概念，然后再详细介绍 BTH 和 ETH：
 
-### QP：通道的端点
+### QP（Queue Pair）
 
-传输层的通信端点是 **QP（Queue Pair，队列对）**。一个 QP 代表通道的一端，包含两条工作队列：发送队列和接收队列。两个分处不同机器、不同地址空间的应用，各自持有一个 QP，配对起来就形成一条端到端的通道。
-
-QP 的关键之处在于：数据传输时它让应用**绕过内核**，由网卡硬件直接处理收发，并在硬件层面保证可靠性。应用把要做的操作放进队列，剩下的交给硬件。
+传输层的通信端点是 **QP**。一个 QP 代表通道的一端，包含两条工作队列：发送队列和接收队列。两个分处不同机器、不同地址空间的应用，各自持有一个 QP，配对起来就形成一条端到端的通道。
 
 ### 分段（也叫分片）与重组
 
@@ -152,31 +139,33 @@ QP 的关键之处在于：数据传输时它让应用**绕过内核**，由网�
 
 早期 IB 严格要求 in-order，因此，传统上 IB 的可靠传输就是建立在有序到达的假设上的。
 
-但现代大规模场景出现了变化，例如：万卡 AI 集群里，为了用满多路径带宽，引入了自适应路由(adaptive routing)：同一个流的包可能走不同路径，这就会引入乱序。为此较新的 IB 硬件和协议加入了对乱序的支持能力(比如支持 out-of-order 数据放置、由硬件处理重排)。
+但现代大规模场景出现了变化，例如：万卡 AI 集群里，为了用满多路径带宽，引入了自适应路由(adaptive routing)：同一个流的包可能走不同路径，这就会引入乱序。为此，较新的 IB 硬件和协议加入了对乱序的支持能力(比如支持 out-of-order 数据放置，由硬件处理重排)。
 
 ### 传输服务类型
 
-传输层提供不同的服务类型，由两个维度组合而成：
+正如RDMA 章节介绍的，传输层提供不同的服务类型，例如：RC、UC、UD。具体选哪一种，取决于应用对可靠性和连接模型的需求。
 
-一个维度是**Connectd vs Datagram**。Connected 服务把一个 QP 专门绑定到单一的对端连接上，一对一通信；Datagram 服务允许一个 QP 同时与多个对端通信，一对多灵活，但不支持消息分段（因此单次传输受限于 MTU 大小）。
+### BTH（Basic Transport Header）基础传输头
 
-另一个维度是**Reliable vs Unreliable**。可靠（reliable）服务保证数据按序、无丢失地到达，硬件负责确认和必要的重传；不可靠（unreliable）服务不提供这些保证。
+![BTH](../assets/IB_BTH_structure.svg)
 
-这两个维度组合，就得到了 IB 的几种传输服务，例如：RC、UC、UD等。选哪一种，取决于应用对可靠性和连接模型的需求。
+RDMA 语义最终大多都落在 BTH 头的字段上。BTH 里包含：
 
-### BTH（Basic Transport Header）如何承载这些语义
+- **QPN**：这个包要交给对端哪个 QP？
+- **Opcode**：这是一次RDMA Send、Write 还是 Read？
+- **PSN**：用于接收端校验包的顺序、检测丢失、支持可靠服务的重传。
 
-这些语义最终都落在 BTH 这个头的字段上。BTH 里包含：**目的 QPN**（这个包要交给对端哪个 QP）、**操作类型**（这是一次 Send、RDMA Write 还是 Read）、以及 **PSN（Packet Sequence Number，包序列号）**（用于接收端校验包的顺序、检测丢失、支持可靠服务的重传）。目标网卡解析 BTH，就知道该把这个包交给哪个 QP、做什么操作，以及它在序列中的位置。
+总之，目标网卡解析 BTH，就知道该把这个包交给哪个 QP、做什么操作，以及它在序列中的位置。
 
 ### ETH（Extended Transport Header）扩展传输头
 
-BTH 只是传输层头的"基础部分"，它本身不携带操作的具体参数。真正让 RDMA 操作落地的，是跟在 BTH 后面的 **ETH（Extended Transport Header，扩展传输头）**，它是一组根据操作类型按需附加的头部字段。
+BTH 只是传输层头的"基础部分"，它本身不携带操作的具体参数。真正让 RDMA 操作落地的，是跟在 BTH 后面的 **ETH（Extended Transport Header，扩展传输头）**，它是一组根据操作类型（Opcode）按需附加的头部字段。
 
 不同操作对应不同的 ETH：
 
-- **RETH（RDMA Extended Transport Header）**：用于 RDMA Write 和 RDMA Read 请求。携带目标虚拟地址（VA）、R_Key（远端内存授权令牌）和数据长度（DMALen）——网卡拿到这三个字段，才知道往哪块远端内存写、有没有权限写、要写多少。
+- **RETH（RDMA Extended Transport Header）**：用于 RDMA Write 和 RDMA Read 请求。携带目标虚拟地址（VA）、R_Key 和数据长度（DMALen）——网卡拿到这三个字段，才知道往哪块远端内存写、有没有权限写、要写多少。
 - **AETH（ACK Extended Transport Header）**：用于 ACK 和 RDMA Read 响应。携带序列号和信用量（Credit），是可靠传输确认机制的载体。
-- **DETH（Datagram Extended Transport Header）**：用于 UD（Unreliable Datagram）服务，携带Source QPN 和 Q_Key（安全校验），因为 UD 模式下接收方无法从连接上下文里推断来源。
+- **DETH（Datagram Extended Transport Header）**：用于 UD（Unreliable Datagram）服务，携带Source QPN 和 Q_Key，因为 UD 模式下接收方无法从连接上下文里推断来源。
 
 这些 ETH 扩展头字段在前面的抓包分析中已经又充分的展示，在此就不再对其结构内容做赘述了。
 
@@ -198,19 +187,21 @@ BTH 只是传输层头的"基础部分"，它本身不携带操作的具体参�
 
 在 Verbs 之上，IB 长出了一个协议生态，让不同类型的应用都能用上 IB。几个有代表性的：
 
-- **并行计算库**：为分布式/并行计算（典型如 HPC 里的 MPI）提供的库接口，让计算节点之间高效通信。这是 IB 在超算和 AI 训练里的主战场。
-- **IPoIB（IP over InfiniBand）**：在 IB 之上跑 TCP/IP。它让那些"不懂 IB"的传统 socket 应用，不加改动就能运行在 IB 网络上。不过，代价是绕回了 TCP/IP 那套，享受不到 RDMA 的全部好处，但胜在兼容。
-- **远程存储协议（SRP / iSER）**：让一台计算机通过 RDMA 访问另一台计算机上挂载的 SCSI 存储设备，把 IB 的低延迟用在存储网络上。
+- 集合通信库(**MPI / NCCL**):这是 IB 价值最集中的地方。分布式计算的通信很少是简单的点对点收发，更多是 all-reduce、all-gather、broadcast 这类"集合通信"：一组节点按某种模式集体交换数据；把这些模式高效地映射成底层的 RDMA 操作，正是集合通信库的职责。
+  - HPC 世界的老牌选手是 **MPI**，几十年来一直是超算互联的事实标准；
+  - AI 训练世界则由 **NCCL**(NVIDIA Collective Communications Library) 主导(AMD 侧的对应物是 RCCL)。多机多卡训练里的梯度同步，本质上就是一次次 all-reduce，NCCL 把它拆成环形或树形的通信模式，再落到具体的 GPU 间传输上（详见第十九章）。
 
-这个生态的意义在于：IB 既能让追求极致性能的应用直接用原生 Verbs，也能让大量现成的、不感知 IB 的应用通过 IPoIB 这类协议平滑接入。
+- **IPoIB**(IP over InfiniBand):在 IB 之上跑 TCP/IP。它让那些"不懂 IB"的传统 socket 应用，不加改动就能运行在 IB 网络上。不过,代价是绕回了 TCP/IP 那套东西,享受不到 RDMA 的全部好处。
+
+- 远程存储协议(**SRP / iSER**):让一台计算机通过 RDMA 访问另一台计算机上挂载的 SCSI 存储设备，把 IB 的低延迟用在存储网络上。
 
 ### 管理服务
 
-IB 架构在上层定义了一套管理消息和协议，分成两类，它们各自走一个特殊的 QP，这一点很能体现 IB 的设计精巧。
+IB 架构在上层定义了一套管理消息和协议，分成两类，它们各自走一个特殊的 QP：
 
-**子网管理（Subnet Management）**：用于子网管理器发现拓扑、分配 LID、配置端口等核心管理任务。它使用一种特殊的管理数据报——**SMP（Subnet Management Packet，子网管理包）**，走专门的 **QP0**，并且**不受流控约束**。为什么不受流控？因为子网管理是网络得以运转的前提，在网络刚上电、流控信用都还没协商好的时候，管理包就必须能够通行。
+**子网管理（Subnet Management）**：用于子网管理器发现拓扑、分配 LID、配置端口等核心管理任务。它使用一种特殊的管理数据报：**SMP（Subnet Management Packet，子网管理包）**，走专门的 **QP0**，并且**不受流控约束**。为什么不受流控？因为子网管理是网络得以运转的前提，在网络刚上电、流控信用都还没协商好的时候，管理包就必须能够通行。
 
-**通用服务（General Services）**：用于子网管理之外的其他管理任务（性能监控、设备信息查询等）。它使用 **GMP（General Management Packet，通用管理包）**，走另一个特殊的 QP——**QP1**，也叫 **GSI（General Service Interface，通用服务接口）**，并且**受流控约束**（因为这类流量不像子网管理那样具有"先有鸡还是先有蛋"的紧迫性，可以正常排队）。
+**通用服务（General Services）**：用于子网管理之外的其他管理任务（性能监控、设备信息查询等）。它使用 **GMP（General Management Packet，通用管理包）**，走另一个特殊的 QP：**QP1**，也叫 **GSI（General Service Interface，通用服务接口）**，并且**受流控约束**（因为这类流量不像子网管理那样具有"先有鸡还是先有蛋"的紧迫性，可以正常排队）。
 
 QP0 和 QP1 是每个端口都预留的两个特殊 QP，专门承载管理流量，和应用用的普通 QP 分开。这样管理面和数据面在通道层面就是隔离的。
 
@@ -221,23 +212,31 @@ QP0 和 QP1 是每个端口都预留的两个特殊 QP，专门承载管理流�
 我们逐层走完了 InfiniBand 的网络架构。现在回到那个完整的 IB 数据包，每个字段的归属和作用应该都清晰了：
 
 ```
-┌─────────┬──────────┬──────────┬───────────────┬─────────────┬─────────────┐
-│   LRH   │   GRH    │   BTH    │    Payload    │    ICRC     │    VCRC     │
-├─────────┼──────────┼──────────┼───────────────┼─────────────┼─────────────┤
-│  Link   │ Network  │Transport │  Upper-layer  │ end-to-end  │ link-level  │
-│  layer  │  layer   │  layer   │     data      │     CRC     │     CRC     │
-│         │          │          │               │             │             │
-│ src/dst │ src/dst  │ dst QPN, │  app data or  │ covers      │ covers the  │
-│ LID, SL │ GID;     │ opcode,  │  ULP payload  │ invariant   │ whole       │
-│         │ inter-   │ PSN      │               │ fields      │ packet,     │
-│         │ subnet   │          │               │ end-to-end  │ per-hop     │
-│         │ only     │          │               │             │             │
-├─────────┼──────────┼──────────┼───────────────┼─────────────┼─────────────┤
-│ Switch: │ Router:  │ Dest HCA:│  Application/ │ Receiver    │ Each hop    │
-│ look up │ route    │ parse,   │  ULP          │ verifies    │ recomputes  │
-│ LFT,    │ across   │ deliver  │               │             │             │
-│ forward │ subnets  │ to QP    │               │             │             │
-└─────────┴──────────┴──────────┴───────────────┴─────────────┴─────────────┘
+┌─────────┬─────────┬───────────┬─────────────┬──────────────┬────────────┬────────────┐
+│   LRH   │   GRH   │    BTH    │     ETH     │   Payload    │    ICRC    │    VCRC    │
+├─────────┼─────────┼───────────┼─────────────┼──────────────┼────────────┼────────────┤
+│   Link  │ Network │ Transport │  Transport  │ Upper-layer  │ end-to-end │ link-level │
+│  layer  │  layer  │   layer   │    layer    │     data     │    CRC     │    CRC     │
+│         │         │           │  (optional) │              │            │            │
+│         │         │           │             │              │            │            │
+│ src/dst │ src/dst │ dst QPN,  │ ext. header │ app data or  │ covers     │ covers the │
+│ LID, SL │ GID;    │ opcode,   │ per opcode: │ ULP payload  │ invariant  │ whole      │
+│         │ inter-  │ PSN       │ RETH (VA,   │              │ fields     │ packet,    │
+│         │ subnet  │           │ R_Key,len), │              │ end-to-end │ per-hop    │
+│         │ only    │           │ DETH (UD),  │              │            │            │
+│         │         │           │ Atomic,     │              │            │            │
+│         │         │           │ ImmDt       │              │            │            │
+├─────────┼─────────┼───────────┼─────────────┼──────────────┼────────────┼────────────┤
+│ Switch: │ Router: │ Dest HCA: │ Dest HCA:   │ Application/ │ Receiver   │ Each hop   │
+│ look up │ route   │ parse,    │ parse per   │ ULP          │ verifies   │ recomputes │
+│ LFT,    │ across  │ deliver   │ opcode      │              │            │            │
+│ forward │ subnets │ to QP     │             │              │            │            │
+└─────────┴─────────┴───────────┴─────────────┴──────────────┴────────────┴────────────┘
 ```
 
-把四层串起来看：链路层用 LID 在子网内转发、用 SL/VL 提供服务质量、用基于信用的流控做到无损；网络层用 GID 跨子网路由，跨子网时重写 LRH 而保持 GRH 不变；传输层用 QP 建立端到端通道，通过 BTH 承载 Send 与 RDMA Read/Write 的语义；上层用 Verbs 暴露给应用，并在其上生长出 IPoIB、MPI、远程存储等协议生态，同时用 QP0/QP1 把管理流量与数据流量隔离开。
+把四层串起来看：
+
+- 链路层用 LID 在子网内转发、用 SL/VL 提供服务质量、用基于信用的流控做到无损；
+- 网络层用 GID 跨子网路由，跨子网时重写 LRH 而保持 GRH 不变；
+- 传输层用 QP 建立端到端通道，由 BTH 标明操作类型与目标 QP，再通过可选的 ETH（如 RDMA 读写用的 RETH）携带远程虚拟地址、R_Key 与长度等操作专属信息；
+- 上层用 Verbs 暴露给应用，并在其上生长出 IPoIB、MPI、远程存储等协议生态，同时用 QP0/QP1 把管理流量与数据流量隔离开。

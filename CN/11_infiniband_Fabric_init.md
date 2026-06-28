@@ -15,7 +15,10 @@
 ibsim拓扑文件如下，存放于 `~/ib1.net`：
 
 ```bash
-# Hca1 [1]─────────[1] Switch1 [3]────────[4] Switch2 [1]─────────[1] Hca2
+#      Switch1 ──────── Switch2
+#         |                |
+#         |                |
+#        Hca1             Hca2
 
 Switch  8 "Switch1"
 [1]     "Hca1"[1]
@@ -485,7 +488,6 @@ Ca 2 "Hca2"     nodeguid 100003 sysimgguid 100003
 100004  [1]     "Switch2"[1]     lid 5 lmc 0 smlid 1  4x  2.5G Active/LinkUp
 100005  [2]                      lid 0 lmc 0 smlid 0  4x  2.5G Down/Polling
 #  dumped 4 nodes
-
 ```
 
 ## 11.3 初始化的几个阶段
@@ -529,7 +531,7 @@ Jun 17 16:47:41 489882 [3DA006C0] 0x02 -> SUBNET UP
 
 **进入 DISCOVERING 状态**：SM 一启动，先进入"发现"状态，准备探索网络。
 
-**绑定各管理类**：`Mgmt class 0x81` 是子网管理接口（SMI，SM 用来发管理报文的通道），`0x03` 是子网管理（SA），`0x04` 是性能管理等。SM 启动时把这些管理服务的通道一一绑定到自己的端口上——这些正是 IB 管理面的几条标准通道。
+**绑定各管理类**：`Mgmt class 0x81` 是子网管理接口（SMI，SM 用来发管理报文的通道），`0x03` 是子网管理（SA），`0x04` 是性能管理等。SM 启动时把这些管理服务的通道一一绑定到自己的端口上。这些是 IB 管理面的几条标准通道，走的是 QP0 / QP1。
 
 **Setting IS_SM**：SM 在自己所在的端口上打出"我是 SM"的标记，向 fabric 宣告身份。
 
@@ -582,7 +584,7 @@ packet (attr 0x11 ...) reached host Hca2 port 1         ← 再顺着 Switch2 �
 
 这里有一个值得停下来想一想的细节：SM 是怎么在还没有给任何设备分配 LID 的情况下，就能把报文发到这些设备的？
 
-答案是 **directed routing（定向路由）**——发现阶段的 SMP 不靠 LID 寻址，而是按"从我出发，先走第几个端口，再走第几个端口"这样的逐跳路径来投递。正因如此，SM 才能在"网络里还没有任何地址"的最初时刻完成发现。这正是先前提到的"先有鸡还是先有蛋"问题的实际解法：发现用定向路由，地址是发现之后才分配的。（discover 行为与 DFS/BFS 非常类似）
+答案是 **directed routing（定向路由）**。发现阶段的 SMP 不靠 LID 寻址，而是按"从我出发，先走第几个端口，再走第几个端口"这样的逐跳路径来投递。正因如此，SM 才能在"网络里还没有任何地址"的最初时刻完成发现。（discover 行为与 DFS/BFS 算法非常类似）
 
 > 从主机视角看，`ibnetdiscover` 把 SM 发现到的整张拓扑以可读的形式列出来，可以和上面日志里 SM 的探索过程相互印证。
 
@@ -679,15 +681,17 @@ Ca 2 "Hca2"     nodeguid 100003 sysimgguid 100003
 
 几个值得注意的点：
 
-交换机的 LID 分配在 **port 0**（标为 "Sma Port"）。这是交换机的管理端口：交换机的众多数据端口本身不需要各自的 LID，整台交换机作为一个可管理实体，用 port 0 的 LID 来标识。HCA 则是每个工作端口都有自己的 LID。
+- 交换机的 LID 分配在 **port 0**（标为 "Sma Port"）。这是交换机的管理端口：交换机的众多数据端口本身不需要各自的 LID，整台交换机作为一个可管理实体，用 port 0 的 LID 来标识。HCA 则是每个工作端口都有自己的 LID。
 
-每行的 `smlid 1` 表示：这个端口知道 SM 位于 lid 1。全网所有端口的 smlid 都指向 1，意味着大家都认同 lid 1（也就是 Switch1）上的那个 SM 是主管。
+- 每行的 `smlid 1` 表示管理它的主 SM 位于 LID 1。这个值由主 SM 在配置扫描时写入每个端口的 PortInfo 里。
 
-`lmc 0` 是 LID Mask Control，简单理解为每个端口只分到一个 LID（lmc 用于给一个端口分配多个连续 LID 以支持多路径，这里取 0）。
+- `lmc 0` 是 LID Mask Control，用于给一个端口分配多个连续 LID 以支持多路径。这里值为 0 可以简单理解为每个端口只分到一个 LID。
 
-还可以注意到 lid 4 被跳过了：LID 的分配并不保证连续，SM 按自己的算法分配，中间出现空号是正常的，不必深究。
+- 还可以注意到 lid 4 被跳过了，因为 LID 的分配并不保证连续，SM 按自己的算法分配，中间出现空号是正常的，不必深究。
 
-> 用 `ibaddr` 可以单独查某个端口的 LID/GID，`smpquery nodeinfo <lid>` 可以查到对应节点的 GUID、设备类型等，验证 dump 里看到的分配结果。
+---
+
+用 `ibaddr` 可以单独查某个端口的 LID/GID，`smpquery nodeinfo <lid>` 可以查到对应节点的 GUID、设备类型等，验证 dump 里看到的分配结果。
 
 ```bash
 expert@net21:~$ ibaddr
@@ -736,7 +740,7 @@ LID 分配好之后，SM 为每台交换机计算转发表（LFT），决定"发
 
 直接看 dump 里 Switch1 的转发表：
 
-```
+```bash
 Switch 8 "Switch1"      nodeguid 200000 sysimgguid 200000
 #       linearcap 49152 FDBtop 5 portchange 0
 #       Forwarding table 0-5: [0]FF [1]0 [2]1 [3]3 [4]FF [5]3
@@ -757,7 +761,7 @@ Switch 8 "Switch1"      nodeguid 200000 sysimgguid 200000
 
 再看 Switch2 的转发表印证这一点：
 
-```
+```bash
 Switch 8 "Switch2"      nodeguid 200001 sysimgguid 200001
 #       linearcap 49152 FDBtop 5 portchange 0
 #       Forwarding table 0-5: [0]FF [1]4 [2]4 [3]0 [4]FF [5]1
@@ -767,7 +771,9 @@ Switch 8 "Switch2"      nodeguid 200001 sysimgguid 200001
 
 **两张表合起来，就构成了完整的多跳转发**：一个从 Hca1 发往 Hca2 的包，Switch1 查表知道"去 lid 5 走 port3"，把它送到 Switch2；Switch2 查表知道"去 lid 5 走 port1"，把它交给 Hca2。每台交换机只管自己这一跳，靠各自的 LFT 接力，包就走到了终点。所以，路径不是交换机自己学出来的，而是 SM 算好、分段写进每台交换机的转发表里的。
 
-> `ibroute <lid>` 把单台交换机的 LFT 以"LID → 出端口"的表格形式列出，比 dump 里那行紧凑的十六进制更直观。
+---
+
+`ibroute <lid>` 把单台交换机的 LFT 以"LID → 出端口"的表格形式列出，比 dump 里那行紧凑的十六进制更直观。
 
 ```bash
 expert@net21:~$ ibroute 1
@@ -793,7 +799,7 @@ Unicast lids [0x0-0x5] of switch Lid 3 guid 0x0000000000200001 (Switch2):
 4 valid lids dumped
 ```
 
-可以在ibsim上查看某个lid到另外一个lid的转发路径：
+也可以在 ibsim 上查看某个 lid 到另外一个 lid 的转发路径：
 
 ```bash
 # Route <from-lid> <to-lid>
@@ -811,7 +817,7 @@ To node "Hca1" port 1 lid 2
 
 **端口配置**：dump 里每个活动端口都带着 `4x 2.5G Active/LinkUp` 这样的描述，这里的 `4x`（链路宽度）、`2.5G`（速率）以及前面看到的 LID、MTU 等，都是 SM 在端口配置阶段设定的参数。
 
-> `smpquery portinfo <lid> <port>` 能展开看某个端口的全部参数，LID、LMC、MTU、链路宽度/速率、当前状态等，对应 SM 在端口配置阶段写入的内容。相当于 `show interface xx`
+> `smpquery portinfo <lid> <port>` 能展开看某个端口的全部参数，LID、LMC、MTU、链路宽度/速率、当前状态等，对应 SM 在端口配置阶段写入的内容。相当于网络工程师熟悉的 `show interface xx` 。
 
 ```bash
 expert@net21:~$ smpquery portinfo 3 1
@@ -879,7 +885,7 @@ LinkSpeedExtEnabled2:............0
 
 到这里，初始化的故事讲完了。但 SM 的工作并没有结束，它不是配置完就退场的一次性程序，而是持续运行、不断守护着这张网络。
 
-SM 的运行时行为分两种扫描：
+SM 有两种扫描模式：
 
 **light sweep（轻扫描）**：周期性地、轻量地巡查一遍，主要是检查各端口的状态有没有变化。开销小，频繁进行。
 
@@ -998,7 +1004,7 @@ Jun 17 17:21:28 954937 [3DA006C0] 0x02 -> SUBNET UP
 
 跟着这条因果链走：
 
-1. **收到 trap**：设备主动上报了一个"链路状态变化"通知（num:128）。这正是前面讲过的——SMA 在端口状态变化时主动通知 SM，而不是等着 SM 下次来问。
+1. **收到 trap**：设备主动上报了一个"链路状态变化"通知（num:128）。说明 SMA 在端口状态变化时会主动通知 SM，而不是等着 SM 下次来问。
 2. **触发 heavy sweep**：注意这次的标志是 `force_heavy_sweep 1`，和启动时的 0 不同——这是被拓扑变化强制触发的重扫描。
 3. **端口状态变化**：`Switch1 port 3 changed state from ACTIVE to DOWN`，互联口断了。
 4. **摘除失联端口**：`drop_mgr_remove_port` 把 Switch2（lid 3）和 Hca2（lid 5）从可达集合里移除——因为通往它们的唯一链路断了，它们现在不可达。伴随的 `GID out of service` 是在通告"这些地址下线了"。
@@ -1357,8 +1363,8 @@ Switch1 去往 Switch2 和 Hca2 的路由又回来了，网络完全恢复。
 
 我们用 ibsim + opensm，把一张 IB fabric 从"插好线"到"能通信"的全过程看了一遍：
 
-SM 启动后进入 DISCOVERING，用定向路由的 SMP 从脚下的交换机出发逐跳发现整张拓扑，收集每个节点和端口的信息，给每个端口分配 LID，为每台交换机计算并下发 LFT，配置端口参数并把它们推进到 ACTIVE，最终 SUBNET UP：一张每个端口有地址、每台交换机有转发表、任意两点可达的网络就此诞生。
+SM 启动后进入 DISCOVERING，用定向路由的 SMP 从脚下的交换机出发逐跳发现整张拓扑，收集每个节点和端口的信息，给每个端口分配 LID，为每台交换机计算并下发 LFT，配置端口参数并把它们推进到 ACTIVE，最终 SUBNET UP。一张每个端口有地址、每台交换机有转发表、任意两点可达的网络就此诞生。
 
-而通过 unlink/relink 的演示，我们还看到 SM 并非配置完就退场：它持续运行，靠 light sweep 周期巡查、靠 heavy sweep 响应拓扑变化，始终维护着这张网络的正确状态。
+通过 unlink/relink 的演示，我们还看到 SM 并非配置完就退场：它持续运行，靠 light sweep 周期巡查、靠 heavy sweep 响应拓扑变化，始终维护着这张网络的正确状态。
 
-OpenSM 就是那个一直在后台运转的循环：发现拓扑 → 编号 → 算路由 → 下发 → 持续监控。前面几章里那些抽象的概念（LID、LFT、SMP、SM）到此已经非常清晰。
+OpenSM 工作逻辑可以概括为：发现拓扑 → 编号 → 算路由 → 下发 → 持续监控。

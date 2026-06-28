@@ -166,7 +166,7 @@ https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html
 
 [node 1 log](../pcap/nccl/nccl_node1.log)
 
-[node 2 log](../pcap/nccl/nccl_node1.log)
+[node 2 log](../pcap/nccl/nccl_node2.log)
 
 [node 0 pcap](../pcap/nccl/nccl_node0.pcap)
 

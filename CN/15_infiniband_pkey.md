@@ -486,7 +486,7 @@ ibwarn: [14402] sim_connect: attached as client 1 at node "Sw1"
 
 ---
 
-## 15.8 与以太网 VLAN 的对照
+## 15.7 与以太网 VLAN 的对照
 
 最后，我们把 IB 分区和最熟悉的 VLAN 并排放一起，看清它们神似而形不同。
 
@@ -509,7 +509,7 @@ ibwarn: [14402] sim_connect: attached as client 1 at node "Sw1"
 
 ---
 
-## 15.9 小结
+## 15.8 小结
 
 **P_Key 是 IB 的分区载体**：16 位里低 15 位是分区键值（决定"是不是同一个分区"），最高位是成员位（决定"在分区里是完全还是受限身份"）。每个端口持有一张 P_Key 表，记录自己属于哪些分区；每个数据包在 BTH 里携带 P_Key，接收方据此比对、决定收丢。
 

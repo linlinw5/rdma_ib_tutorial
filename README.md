@@ -1,3 +1,5 @@
+> English version: [README.en.md](README.en.md)
+
 # RDMA 与 InfiniBand 网络详解
 
 如果说过去十年的数据中心属于云计算，那么未来十年的数据中心，很可能属于 AI。

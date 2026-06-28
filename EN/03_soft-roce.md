@@ -1,70 +1,70 @@
-# 第三章：Soft-RoCE (RXE) 介绍
+# Chapter 3: Introduction to Soft-RoCE (RXE)
 
-接下来的章节，我们准备在实验环境中通过抓包分析RDMA的通信细节，以深入理解RDMA。我没有IB和RoCE的硬件环境，因此需要用软件模拟出一个可以测试RDMA verbs的环境。本章介绍Soft-RoCE以及linux内置的各种RDMA发包工具。
+In the chapters that follow, we will analyze the details of RDMA communication through packet captures in a lab environment, in order to understand RDMA in depth. I don't have IB or RoCE hardware, so I need to use software to simulate an environment in which RDMA verbs can be tested. This chapter introduces Soft-RoCE as well as the various RDMA packet-generating tools built into Linux.
 
-## 3.1 soft-RoCE定位与背景
+## 3.1 The Role and Background of Soft-RoCE
 
-Soft-RoCE 的正式名称是 RXE（Soft RDMA over Converged Ethernet），是一个纯软件实现的 RoCEv2 协议栈，运行在普通以太网网卡上，无需任何 RDMA 专用硬件支持。
+The formal name of Soft-RoCE is RXE (Soft RDMA over Converged Ethernet). It is a pure-software implementation of the RoCEv2 protocol stack that runs on ordinary Ethernet NICs, requiring no RDMA-specific hardware support whatsoever.
 
-它最早由 Bob Pearson 等人于 2008 年在 SystemFabricWorks 开发，2016 年随 Linux 内核 v4.8 合并进主线，Ubuntu 18.04 及之后的版本均可开箱使用，无需额外安装内核模块。
+It was first developed by Bob Pearson and others at SystemFabricWorks in 2008, and was merged into the mainline in 2016 with Linux kernel v4.8. Ubuntu 18.04 and later versions can use it out of the box, with no need to install an additional kernel module.
 
-RXE 的设计目标是为没有 HCA 硬件的开发者提供完整的 RDMA verbs 开发与测试环境，同时也适用于协议研究、教学以及 CI/CD 流水线中的 RDMA 功能验证。
+The design goal of RXE is to provide developers without HCA hardware with a complete RDMA verbs development and testing environment, while also being suitable for protocol research, teaching, and RDMA functional verification in CI/CD pipelines.
 
 ---
 
-## 3.2 相关目录/文件解释
+## 3.2 Explanation of the Relevant Directories/Files
 
 ![soft_roce_call_path](../assets/soft_roce_call_path.svg)
 
-图中展示了 soft-RoCE 在 Linux 系统中运行涉及的两条并行的路径：
+The figure shows the two parallel paths involved when Soft-RoCE runs in a Linux system:
 
-- 左侧是数据平面（verbs 操作，create_qp / post_send 等）
-- 右侧是管理平面（设备查询、连接管理）
+- The left side is the data plane (verbs operations: create_qp / post_send, etc.)
+- The right side is the management plane (device queries, connection management)
 
-两条路径在内核里汇聚到 rdma_rxe.ko。图中的调用链揭示了 Soft-RoCE 的本质：整条路径没有任何硬件卸载，所有的 RDMA 语义全部由 rdma_rxe.ko 在 CPU 上以软件方式完成，数据包同样要经过完整的内核 IP 栈和 udp_tunnel.ko 封装，才能从普通网卡发出。
+The two paths converge in the kernel at rdma_rxe.ko. The call chain in the figure reveals the essence of Soft-RoCE: there is no hardware offload anywhere along the path. All RDMA semantics are performed entirely by rdma_rxe.ko in software on the CPU, and packets must also pass through the complete kernel IP stack and udp_tunnel.ko encapsulation before they can be sent out from an ordinary NIC.
 
-这与真实 HCA 的根本差异在于：硬件 RDMA 卡的 DMA 引擎可以直接将数据从远端内存搬运到本地，绕过 CPU 和内核；而 RXE 做不到这一点，每一个 RDMA 操作都会消耗 CPU 周期，吞吐量和延迟也远不及真实硬件。
+The fundamental difference from a real HCA is this: the DMA engine of a hardware RDMA card can move data directly from remote memory to the local side, bypassing the CPU and the kernel; whereas RXE cannot do this, every RDMA operation consumes CPU cycles, and its throughput and latency fall far short of real hardware.
 
-但这恰恰是 Soft-RoCE 的设计取舍所在：它的目标从来不是性能，而是在没有任何 IB/RoCE 硬件的条件下，提供一个行为完整、接口兼容的 RDMA 开发和测试环境。
+But this is precisely where Soft-RoCE makes its design trade-off: its goal was never performance, but rather to provide a behaviorally complete, interface-compatible RDMA development and testing environment in the absence of any IB/RoCE hardware.
 
-### `/usr/lib/x86_64-linux-gnu/libibverbs/` — Provider 插件库
+### `/usr/lib/x86_64-linux-gnu/libibverbs/` — Provider Plugin Libraries
 
-这里每个 `.so` 对应一种 HCA 厂商或软件实现：
+Each `.so` here corresponds to an HCA vendor or software implementation:
 
-| 文件                       | 对应硬件/实现              |
-| -------------------------- | -------------------------- |
-| `libmlx5-rdmav34.so`       | Mellanox ConnectX-4/5/6/7  |
-| `libmlx4-rdmav34.so`       | Mellanox ConnectX-3        |
-| `libbnxt_re-rdmav34.so`    | Broadcom NetXtreme         |
-| `libefa-rdmav34.so`        | AWS Elastic Fabric Adapter |
-| `libhns-rdmav34.so`        | Huawei HiSilicon           |
-| `libirdma-rdmav34.so`      | Intel E810 iWARP/RoCE      |
-| `libmana-rdmav34.so`       | Microsoft Azure MANA       |
-| `libvmw_pvrdma-rdmav34.so` | VMware PVRDMA              |
-| `librxe-rdmav34.so`        | Soft-RoCE                  |
+| File                       | Corresponding hardware/implementation |
+| -------------------------- | ------------------------------------- |
+| `libmlx5-rdmav34.so`       | Mellanox ConnectX-4/5/6/7             |
+| `libmlx4-rdmav34.so`       | Mellanox ConnectX-3                   |
+| `libbnxt_re-rdmav34.so`    | Broadcom NetXtreme                    |
+| `libefa-rdmav34.so`        | AWS Elastic Fabric Adapter            |
+| `libhns-rdmav34.so`        | Huawei HiSilicon                      |
+| `libirdma-rdmav34.so`      | Intel E810 iWARP/RoCE                 |
+| `libmana-rdmav34.so`       | Microsoft Azure MANA                  |
+| `libvmw_pvrdma-rdmav34.so` | VMware PVRDMA                         |
+| `librxe-rdmav34.so`        | Soft-RoCE                             |
 
-**`-rdmav34` 后缀的含义：** 这是 ABI 版本标记，`34` 表示 libibverbs 的第 34 版 provider ABI。libibverbs 升级时如果改了 provider 接口，这个数字就会变，防止新框架加载旧 provider 导致崩溃。
+**The meaning of the `-rdmav34` suffix:** this is the ABI version marker, where `34` indicates version 34 of the libibverbs provider ABI. When libibverbs is upgraded and changes the provider interface, this number changes, preventing a new framework from loading an old provider and crashing.
 
-应用代码完全不知道底层是 rxe 还是 mlx5，这层抽象是 libibverbs 最核心的设计。
+The application code has no idea whether the underlying layer is rxe or mlx5; this layer of abstraction is the most core design of libibverbs.
 
 ---
 
-### `/sys/class/infiniband/` — 设备元数据（sysfs）
+### `/sys/class/infiniband/` — Device Metadata (sysfs)
 
 ```
 /sys/class/infiniband/rxe0 -> ../../devices/virtual/infiniband/rxe0/
 ```
 
-`virtual` 路径说明 rxe0 是软件虚拟设备，真实 HCA 会在 `devices/pci0000:xx/` 下。
+The `virtual` path indicates that rxe0 is a software virtual device; a real HCA would be under `devices/pci0000:xx/`.
 
-这个目录是**只读配置和状态信息**：
+This directory holds **read-only configuration and status information**:
 
 ```bash
-# 端口状态
+# Port state
 expert@k8s-61:~$ cat /sys/class/infiniband/rxe0/ports/1/state
 4: ACTIVE
 
-# GID 表
+# GID table
 expert@k8s-61:~$ cat /sys/class/infiniband/rxe0/ports/1/gids/0
 fe80:0000:0000:0000:0250:56ff:fea7:129f
 expert@k8s-61:~$ cat /sys/class/infiniband/rxe0/ports/1/gids/1
@@ -72,63 +72,63 @@ expert@k8s-61:~$ cat /sys/class/infiniband/rxe0/ports/1/gids/1
 
 ```
 
-libibverbs 调用 `ibv_query_device()` 时，实际上就是读这里的 sysfs 文件，不需要进内核。
+When libibverbs calls `ibv_query_device()`, it actually just reads these sysfs files here, with no need to enter the kernel.
 
 ---
 
-### `/dev/infiniband/` — 实际的字符设备节点
+### `/dev/infiniband/` — The Actual Character Device Nodes
 
-这里是真正的系统调用入口，应用通过 `open()` + `ioctl()` 与内核交互：
+This is the real system-call entry point; the application interacts with the kernel through `open()` + `ioctl()`:
 
-- `uverbs0`（主设备）
-- `rdma_cm`（连接管理）
+- `uverbs0` (the main device)
+- `rdma_cm` (connection management)
 
 ---
 
-## 3.3 安装与配置
+## 3.3 Installation and Configuration
 
-**依赖包以及工具包（Ubuntu）：**
+**Dependencies and tool packages (Ubuntu):**
 
 ```bash
 sudo apt update
-# RDMA 用户态核心库和工具：libibverbs、librdmacm、
-# ib_uverbs udev rules、rdma link 命令支持
+# RDMA user-space core libraries and tools: libibverbs, librdmacm,
+# ib_uverbs udev rules, rdma link command support
 sudo apt install rdma-core -y
 
-# libibverbs 附带的基础诊断工具：
-# ibv_devices、ibv_devinfo、ibv_asyncwatch 等
+# Basic diagnostic tools bundled with libibverbs:
+# ibv_devices, ibv_devinfo, ibv_asyncwatch, etc.
 sudo apt install ibverbs-utils -y
 
-# RDMA 性能测试工具：
-# ib_send_bw、ib_read_bw、ib_write_bw、
-# ib_send_lat、ib_read_lat、ib_write_lat 等
+# RDMA performance testing tools:
+# ib_send_bw, ib_read_bw, ib_write_bw,
+# ib_send_lat, ib_read_lat, ib_write_lat, etc.
 sudo apt install perftest -y
 
-# Linux 网络配置工具集，包含 rdma 子命令：
-# ip、tc、ss、rdma link add/show 等
-# 通常系统已预装，这里确保版本够新
+# The Linux network configuration toolset, including the rdma subcommand:
+# ip, tc, ss, rdma link add/show, etc.
+# Usually pre-installed; here we ensure the version is new enough
 sudo apt install iproute2 -y
 
-# InfiniBand 子网诊断工具：
-# ibstat、ibstatus、iblinkinfo、ibping、
-# ibnetdiscover、ibdiagnet 等
+# InfiniBand subnet diagnostic tools:
+# ibstat, ibstatus, iblinkinfo, ibping,
+# ibnetdiscover, ibdiagnet, etc.
 sudo apt install infiniband-diags -y
 
-# librdmacm 附带的连接管理测试工具：
-# rping、rdma_bw、udaddy、mckey 等
+# Connection management testing tools bundled with librdmacm:
+# rping, rdma_bw, udaddy, mckey, etc.
 sudo apt install rdmacm-utils -y
 ```
 
-**启用步骤：**
+**Enabling steps:**
 
 ````bash
-# 1. 加载模块
+# 1. Load the module
 sudo modprobe rdma_rxe
 
-# 2. 绑定网卡
+# 2. Bind the NIC
 sudo rdma link add rxe0 type rxe netdev <dev>
 
-**持久化（重启后自动生效）：**
+**Persistence (automatically takes effect after reboot):**
 
 ```bash
 # /etc/modules-load.d/rxe.conf
@@ -140,17 +140,17 @@ echo 'ens160' | sudo tee /etc/rdma/rxe.conf
 
 ---
 
-## 3.4 验证以及查看信息
+## 3.4 Verification and Inspecting Information
 
 ```bash
-# 查看物理链路信息
+# View physical link information
 expert@k8s-62:~$ ip link
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
 2: ens160: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
     link/ether 00:50:56:a7:7d:03 brd ff:ff:ff:ff:ff:ff
 
-# 查看本机 RDMA 设备的物理层和链路层状态
+# View the physical-layer and link-layer state of the local RDMA device
 expert@k8s-62:~$ ibstat
 CA 'rxe0'
         CA type:
@@ -170,14 +170,14 @@ CA 'rxe0'
                 Port GUID: 0x025056fffea77d03
                 Link layer: Ethernet
 
-# 查看 rdma 设备简要信息，来自 iproute2 包的工具
+# View brief info on the rdma device, a tool from the iproute2 package
 expert@k8s-62:~$ rdma link show
 link rxe0/1 state ACTIVE physical_state LINK_UP netdev ens160
 
 expert@k8s-62:~$ rdma dev
 0: rxe0: node_type ca node_guid 0250:56ff:fea7:7d03 sys_image_guid 0250:56ff:fea7:7d03
 
-# 来自 libibverbs 包的工具
+# A tool from the libibverbs package
 expert@k8s-62:~$ ibv_devices
     device                 node GUID
     ------              ----------------
@@ -307,25 +307,25 @@ hca_id: rxe0
                         GID[  0]:               fe80::250:56ff:fea7:7d03, RoCE v2
                         GID[  1]:               ::ffff:10.1.16.62, RoCE v2
 
-# 可以看到有两个GID：
-# - GID 0：等同于 link-local IPv6 地址，由网卡 MAC 地址通过 EUI-64 规则生成；
-# - GID 1：这是 IPv4-mapped IPv6 地址，格式是 ::ffff:<IPv4>，对应本机网卡配置的 IPv4 地址 10.1.16.62；
+# Note there are two GIDs:
+# - GID 0: equivalent to a link-local IPv6 address, generated from the NIC's MAC address via the EUI-64 rule;
+# - GID 1: this is an IPv4-mapped IPv6 address, in the format ::ffff:<IPv4>, corresponding to the IPv4 address 10.1.16.62 configured on the local NIC;
 ```
 
 ---
 
-## 3.5 perftest测试
+## 3.5 perftest Testing
 
-perftest 是业界标准的 RDMA 性能基准测试套件，下个章节我们会使用 perftest 来发起一个完整的 RDMA 通信并对其进行抓包分析，这里暂先做基础介绍。
+perftest is the industry-standard RDMA performance benchmark suite. In the next chapter we will use perftest to initiate a complete RDMA communication and analyze it via packet capture; here we just give a basic introduction first.
 
-实验环境中目前共两台 vm，安装了 soft-RoCE，后续的测试，将 `10.1.16.61` 作为服务端，将 `10.1.16.62` 作为客户端。
+The lab environment currently has two VMs in total, with Soft-RoCE installed. For the subsequent tests, `10.1.16.61` will serve as the server and `10.1.16.62` as the client.
 
 ```bash
-# Write 带宽测试  ib_write_bw -d <dev> --report_gbits
-# Read 带宽测试   ib_read_bw -d <dev> --report_gbits
-# Send 带宽测试   ib_send_bw -d <dev> --report_gbits
+# Write bandwidth test  ib_write_bw -d <dev> --report_gbits
+# Read bandwidth test   ib_read_bw -d <dev> --report_gbits
+# Send bandwidth test   ib_send_bw -d <dev> --report_gbits
 
-# 服务端
+# Server
 expert@k8s-61:~$ ib_write_bw -d rxe0 --report_gbits
 
 ************************************
@@ -355,7 +355,7 @@ expert@k8s-61:~$ ib_write_bw -d rxe0 --report_gbits
  65536      5000             0.74               0.48               0.000920
 ---------------------------------------------------------------------------------------
 
-# 客户端发起测试
+# Client initiates the test
 expert@k8s-62:~$ ib_write_bw -d rxe0 --report_gbits 10.1.16.61
 ---------------------------------------------------------------------------------------
                     RDMA_Write BW Test
@@ -382,44 +382,44 @@ expert@k8s-62:~$ ib_write_bw -d rxe0 --report_gbits 10.1.16.61
  65536      5000             0.74               0.48               0.000920
 ---------------------------------------------------------------------------------------
 
-# MTU在这里是 1024，因为以太网的 MTU 默认为 1500，RDMA需要写自己的 infiniband 包头，所以默认给数据分到 1024
-# IB 的 MTU 不是任意值，是固定档位：256 / 512 / 1024 / 2048 / 4096，单位字节
+# The MTU here is 1024 because Ethernet's MTU defaults to 1500, and RDMA needs to write its own InfiniBand headers, so the data is allotted 1024 by default
+# IB's MTU is not an arbitrary value; it has fixed tiers: 256 / 512 / 1024 / 2048 / 4096, in bytes
 
-# #bytes = 65536（64KB）
-# 每次 RDMA Write 操作传输的数据量，这是 ib_write_bw 的默认 message size
+# #bytes = 65536 (64KB)
+# The amount of data transferred per RDMA Write operation; this is ib_write_bw's default message size
 
 # iterations = 5000
-# 总共执行了 5000 次 RDMA Write 操作
+# A total of 5000 RDMA Write operations were executed
 
-# avg_bw = (65536 bytes × 5000 次 × 8 bits) / 总耗时
+# avg_bw = (65536 bytes × 5000 times × 8 bits) / total elapsed time
 
 # MsgRate = 0.000920 Mpps = 920 ops/s
-# 每秒完成的 RDMA Write 次数
+# The number of RDMA Write operations completed per second
 
 ```
 
 ---
 
-## 3.6 pingpong 测试
+## 3.6 pingpong Testing
 
-`libibverbs` 自带最简单的 RDMA 连通性验证工具，可以做 Send/Recv pingpong 测试，主要目的是验证 RDMA 链路是否正常，顺带测延迟。
+`libibverbs` comes with the simplest RDMA connectivity verification tool, which can perform a Send/Recv pingpong test. Its main purpose is to verify whether the RDMA link is working, and to measure latency along the way.
 
-注意，RDMA Send 是**双边操作**，发送方 post Send，接收方必须提前 post Recv 才能收到，两边都要参与。这和 RDMA Write/Read 的单边语义完全不同。`ibv_rc_pingpong` 验证的其实是整个 Send/Recv 路径是否通，包括 QP 状态机、GID 解析、AH（Address Handle）构建是否正确。
+Note that RDMA Send is a **two-sided operation**: the sender posts a Send, and the receiver must post a Recv in advance to receive it; both sides must participate. This is entirely different from the one-sided semantics of RDMA Write/Read. What `ibv_rc_pingpong` actually verifies is whether the entire Send/Recv path works, including the QP state machine, GID resolution, and whether the AH (Address Handle) is constructed correctly.
 
 ```bash
-# RC pingpong 延迟  ibv_rc_pingpong -d <dev> -g 1
-# UC pingpong 延迟  ibv_uc_pingpong -d <dev> -g 1
-# UD pingpong 延迟 ibv_ud_pingpong -d <dev> -g 1
-# `-g 1` 指定 GID index 1（IPv4-mapped GID）
+# RC pingpong latency  ibv_rc_pingpong -d <dev> -g 1
+# UC pingpong latency  ibv_uc_pingpong -d <dev> -g 1
+# UD pingpong latency  ibv_ud_pingpong -d <dev> -g 1
+# `-g 1` specifies GID index 1 (the IPv4-mapped GID)
 
-# 服务端
+# Server
 expert@k8s-61:~$ ibv_rc_pingpong -d rxe0 -g 1
   local address:  LID 0x0000, QPN 0x000015, PSN 0x7a34cd, GID ::ffff:10.1.16.61
   remote address: LID 0x0000, QPN 0x000017, PSN 0x1f739d, GID ::ffff:10.1.16.62
 8192000 bytes in 0.63 seconds = 103.78 Mbit/sec
 1000 iters in 0.63 seconds = 631.48 usec/iter
 
-# 客户端发起
+# Client initiates
 expert@k8s-62:~$ ibv_rc_pingpong -d rxe0 -g 1 10.1.16.61
   local address:  LID 0x0000, QPN 0x000017, PSN 0x1f739d, GID ::ffff:10.1.16.62
   remote address: LID 0x0000, QPN 0x000015, PSN 0x7a34cd, GID ::ffff:10.1.16.61
@@ -429,20 +429,20 @@ expert@k8s-62:~$ ibv_rc_pingpong -d rxe0 -g 1 10.1.16.61
 
 ---
 
-## 3.7 rping 测试
+## 3.7 rping Testing
 
-`rping` 是 `librdmacm-utils` 包里的工具，专门用来测试 rdma_cm 连通性，类似 RDMA 世界的 `ping`，`rping` 流程比较复杂，每一轮用了 RDMA READ 和 RDMA WRITE 两个操作交替完成。
+`rping` is a tool from the `librdmacm-utils` package, used specifically to test rdma_cm connectivity, similar to the `ping` of the RDMA world. The `rping` flow is fairly complex, with each round completed by alternating two operations, RDMA READ and RDMA WRITE.
 
 ```bash
-# 服务端
+# Server
 expert@k8s-61:~$ rping -s -d rxe0 -v
 verbose
 created cm_id 0x5617d13d2c20
 rdma_bind_addr successful
 
-# 服务端用 rdma_cm 监听，客户端发起连接请求（CONNECT_REQUEST）
-# 此时双方各自创建 PD、CQ、QP，注册内存缓冲区，然后完成 ESTABLISHED。
-# 这部分是控制平面，走的是 rdma_cm 的 SEND/RECV 交换元数据。
+# The server listens via rdma_cm, and the client initiates a connection request (CONNECT_REQUEST)
+# At this point each side creates a PD, CQ, and QP, registers memory buffers, and then reaches ESTABLISHED.
+# This part is the control plane, exchanging metadata via rdma_cm's SEND/RECV.
 rdma_listen
 cma_event type RDMA_CM_EVENT_CONNECT_REQUEST cma_id 0x71fc24000ce0 (child)
 child cma 0x71fc24000ce0
@@ -455,34 +455,34 @@ allocated & registered buffers...
 accepting client connection request
 cq_thread started.
 
-# --- 服务端收到客户 SEND 的 rkey + addr
+# --- The server receives the rkey + addr sent by the client via SEND
 recv completion
 Received rkey 2095 addr 5b269382e5e0 len 64 from peer
 cma_event type RDMA_CM_EVENT_ESTABLISHED cma_id 0x71fc24000ce0 (child)
 ESTABLISHED
-# 服务端用收到的 rkey/addr 主动发起 RDMA READ，把客户端内存里的数据读过来
+# Using the received rkey/addr, the server actively initiates an RDMA READ to read the data from the client's memory
 server received sink adv
 server posted rdma read req
 rdma read completion
 server received read complete
 server ping data: rdma-ping-0: ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqr
-# 服务端读完后发一个 SEND 通知客户端
+# After reading, the server sends a SEND to notify the client
 server posted go ahead
 send completion
 recv completion
-# 客户端再把自己的另一块缓冲区地址通过 SEND 发给服务端。
+# The client then sends the address of another of its buffers to the server via SEND.
 Received rkey 1f86 addr 5b2693822500 len 64 from peer
 server received sink adv
-# 服务端收到后做 **RDMA WRITE**，把数据写回客户端
+# Upon receiving it, the server does an **RDMA WRITE**, writing data back to the client
 rdma write from lkey 1ed5 laddr 5617d13c7780 len 64
 rdma write completion
 server rdma write complete
-# 再发 SEND 通知客户端写完了
+# Then sends a SEND to notify the client that the write is done
 server posted go ahead
 send completion
-# --- 至此一轮完成，本例总共循环了 5 次（`-C 5`）
+# --- One round is now complete; this example loops 5 times in total (`-C 5`)
 
-# --- 第二轮开始
+# --- The second round begins
 recv completion
 Received rkey 2095 addr 5b269382e5e0 len 64 from peer
 server received sink adv
@@ -501,7 +501,7 @@ server rdma write complete
 server posted go ahead
 send completion
 
-# --- 第三轮开始
+# --- The third round begins
 recv completion
 Received rkey 2095 addr 5b269382e5e0 len 64 from peer
 server received sink adv
@@ -520,7 +520,7 @@ server rdma write complete
 server posted go ahead
 send completion
 
-# --- 第四轮开始
+# --- The fourth round begins
 recv completion
 Received rkey 2095 addr 5b269382e5e0 len 64 from peer
 server received sink adv
@@ -539,7 +539,7 @@ server rdma write complete
 server posted go ahead
 send completion
 
-# --- 第五轮开始
+# --- The fifth round begins
 recv completion
 Received rkey 2095 addr 5b269382e5e0 len 64 from peer
 server received sink adv
@@ -558,10 +558,10 @@ server rdma write complete
 server posted go ahead
 send completion
 
-# 客户端五轮跑完主动断开，服务端收到 RDMA_CM_EVENT_DISCONNECTED，释放资源退出
+# After the client finishes all five rounds, it actively disconnects; the server receives RDMA_CM_EVENT_DISCONNECTED, releases resources, and exits
 cma_event type RDMA_CM_EVENT_DISCONNECTED cma_id 0x71fc24000ce0 (child)
 server DISCONNECT EVENT...
-# 服务端在等最后一个状态机转换
+# The server waits for the final state-machine transition
 wait for RDMA_READ_ADV state 10
 rping_free_buffers called on cb 0x5617d13c67c0
 destroy cm_id 0x5617d13d2c20
@@ -569,10 +569,9 @@ destroy cm_id 0x5617d13d2c20
 
 
 
-
-# 客户端
+# Client
 expert@k8s-62:~$ rping -c -a 10.1.16.61 -C 5 -v
-# 每轮起始字母往后移一位，是 rping 故意做的，用来验证每次读到的数据确实是新的，不是缓存
+# The starting letter of each round shifts forward by one; rping does this on purpose to verify that the data read each time is genuinely new, not cached
 ping data: rdma-ping-0: ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqr
 ping data: rdma-ping-1: BCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrs
 ping data: rdma-ping-2: CDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrst
@@ -583,7 +582,7 @@ client DISCONNECT EVENT...
 
 ---
 
-## 3.8 soft-RoCE 能力边界
+## 3.8 The Capability Boundaries of Soft-RoCE
 
 | Type / Object              | Support |
 | -------------------------- | ------- |

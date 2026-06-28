@@ -465,7 +465,7 @@ ib_read_lat -d rxe0 -n 5 -s 64 10.1.16.61
 
 ---
 
-## 六、ib_atomic_bw 抓包分析
+## 4.7 ib_atomic_bw 抓包分析
 
 [pcap抓包文件](../pcap/rdma_atomic_bw.pcap)
 

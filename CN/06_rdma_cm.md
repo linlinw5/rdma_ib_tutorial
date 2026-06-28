@@ -154,7 +154,7 @@ Local CA GUID:          0x025056fffea7129f
 最后，客户端返回 `ReadToUse`（包3）：
 
 ```bash
-# ConnectReply（包2）
+# ReadyToUse（包3）
 Local Communication ID: 0x64c0c56d
 Remote Communication ID: 0x8988f456
 ```

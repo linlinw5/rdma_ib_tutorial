@@ -1,4 +1,4 @@
-> 中文版本：[readme.md](readme.md)
+> 中文版本：[readme.md](./README.md.md)
 
 # A Deep Dive into RDMA and InfiniBand Networking
 
@@ -164,7 +164,7 @@ The technical content of this document is compiled based on the official materia
 
 **Other References**
 
-- [Liu Wei, *Linux High-Performance Networking Explained: From DPDK, RDMA to XDP*](https://www.epubit.com/bookDetails?id=UBd16b63c7abb7)
+- [Liu Wei, _Linux High-Performance Networking Explained: From DPDK, RDMA to XDP_](https://www.epubit.com/bookDetails?id=UBd16b63c7abb7)
 
 ---
 

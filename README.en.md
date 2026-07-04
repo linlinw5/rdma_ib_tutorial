@@ -1,4 +1,4 @@
-> 中文版本：[readme.md](./README.md)
+> 中文版本：[README.md](./README.md)
 
 # A Deep Dive into RDMA and InfiniBand Networking
 
@@ -143,6 +143,13 @@ The previous three parts took RDMA and InfiniBand apart into individual componen
 
 **[Chapter 19: Seeing How NCCL Uses RDMA Through Packet Captures](EN/19_nccl_rdma.md)**
 Using a three-node GPU server setup to capture AllReduce packets, it strings together the earlier QP, out-of-band TCP connection setup, RDMA Write, and collective algorithms into one complete, observable data flow. First it uses a full capture to see clearly the "three steps of connection setup" (rendezvous → NCCL bootstrap exchanging QPN/GID/rkey → RDMA), then uses two sets of captures to compare the differences between Ring and Tree at the data level.
+
+---
+
+## Afterword
+
+**[Afterword: Lossless and Lossy — A Forty-Year Swing of the Pendulum](EN/99_afterword_fabric_spiral.md)**
+A closing reflection, written once the book was finished, from the vantage point of deployment reality and engineering economics. It introduces no new mechanisms; instead it lays out how the pendulum between "the network bears the determinism" and "best-effort plus endpoint intelligence" has swung over the past forty years: why training and inference diverge into two deployment realities, where the "radius of complexity" bounds the lossless fabric, where PFC/ECN/DCQCN belong, and what UEC is quietly borrowing — before returning to one question: given all that, why spend an entire book on InfiniBand.
 
 ---
 
